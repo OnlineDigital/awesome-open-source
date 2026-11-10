@@ -1,15 +1,10 @@
 package server
 
 import (
+	"errors"
 	"fmt"
-	"github.com/andreitelteu/inertia-go-solid-template/app/application"
-	"github.com/andreitelteu/inertia-go-solid-template/public"
-	"github.com/andreitelteu/inertia-go-solid-template/routes"
-	"github.com/gofiber/fiber/v3"
-	"github.com/gofiber/fiber/v3/middleware/adaptor"
-	"github.com/gofiber/fiber/v3/middleware/recover"
-	"github.com/gofiber/fiber/v3/middleware/static"
 	"io/fs"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -17,65 +12,80 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"awesomeopensource.dev/app/application"
+	"awesomeopensource.dev/app/config"
+	"awesomeopensource.dev/public"
+	"awesomeopensource.dev/routes"
+	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/middleware/adaptor"
+	"github.com/gofiber/fiber/v3/middleware/compress"
+	"github.com/gofiber/fiber/v3/middleware/recover"
+	"github.com/gofiber/fiber/v3/middleware/static"
 )
 
 type Options struct {
-	Demo         bool
-	Environment  string
+	Config       config.Config
 	DevServerURL string
 	// AssetFS is rooted at Vite's build directory. A non-nil filesystem is
 	// authoritative and useful for isolated tests or custom distributions.
 	AssetFS fs.FS
 }
 
-// New creates the actual Fiber server. Production disables diagnostic routes.
-func New(root string) (*fiber.App, error) {
-	env := os.Getenv("APP_ENV")
-	if env == "" {
-		env = defaultEnvironment()
+// New creates the Fiber server and the application behind it.
+func New(root string) (*fiber.App, *application.Application, error) {
+	cfg := config.Load()
+	if cfg.Env == "" {
+		cfg.Env = defaultEnvironment()
 	}
-	return NewWithOptions(root, Options{Demo: env != "production", Environment: env, DevServerURL: os.Getenv("VITE_DEV_SERVER_URL")})
+	return NewWithOptions(root, Options{Config: cfg, DevServerURL: os.Getenv("VITE_DEV_SERVER_URL")})
 }
-func NewWithOptions(root string, options Options) (*fiber.App, error) {
+
+func NewWithOptions(root string, options Options) (*fiber.App, *application.Application, error) {
 	if root == "" {
-		return nil, fmt.Errorf("application root is required")
+		return nil, nil, fmt.Errorf("application root is required")
 	}
 	root, err := filepath.Abs(root)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	if options.Environment == "" {
-		options.Environment = defaultEnvironment()
+	cfg := options.Config
+	if cfg.Env == "" {
+		cfg.Env = defaultEnvironment()
 	}
 	assetFS := options.AssetFS
 	if assetFS == nil {
 		assetFS = public.Assets()
 	}
 	// A shipped bundle or explicit filesystem always wins over dev-server URLs.
-	// Production binaries never use a missing/modified on-disk build as fallback.
 	if assetFS != nil {
 		options.DevServerURL = ""
 	}
-	deps, err := application.NewWithAssets(root, options.Environment, options.DevServerURL, options.Demo, assetFS)
+	deps, err := application.New(root, cfg, options.DevServerURL, assetFS)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
+	}
+	if cfg.UploadDir != "" {
+		if err := os.MkdirAll(cfg.UploadDir, 0o755); err != nil {
+			return nil, nil, fmt.Errorf("create upload dir: %w", err)
+		}
 	}
 	app := fiber.New(fiber.Config{
-		AppName:   "inertia-go + Solid template",
+		AppName:   cfg.SiteName,
 		Immutable: true, StrictRouting: true, CaseSensitive: true,
-		// Keep encoded slashes inside one :parameter. The inertia boundary decodes
-		// the parameter once; reverse URLs use PathEscape on each segment.
-		UnescapePath: false, BodyLimit: 8 << 20,
-		ReadTimeout: 30 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second,
+		UnescapePath: false, BodyLimit: 12 << 20,
+		ReadTimeout: 30 * time.Second, WriteTimeout: 60 * time.Second, IdleTimeout: 60 * time.Second,
+		ErrorHandler: errorHandler(deps),
 	})
 	app.Use(recover.New())
+	app.Use(compress.New())
 	app.Use(func(c fiber.Ctx) error {
 		c.Set("X-Content-Type-Options", "nosniff")
+		c.Set("X-Frame-Options", "SAMEORIGIN")
 		c.Set("Referrer-Policy", "strict-origin-when-cross-origin")
 		c.Set("Cache-Control", "no-cache, private")
 		return c.Next()
 	})
-	// Vite assets are served natively by Fiber. No HTTP file server or ServeMux.
 	if assetFS == nil {
 		assetFS = os.DirFS(filepath.Join(root, "public", "build"))
 	}
@@ -83,9 +93,6 @@ func NewWithOptions(root string, options Options) (*fiber.App, error) {
 		FS: assetFS, Browse: false, MaxAge: 31536000,
 		ModifyResponse: func(c fiber.Ctx) error {
 			c.Set("Cache-Control", "public, max-age=31536000, immutable")
-			// Windows MIME registrations can be absent or incorrect. In
-			// particular, nosniff requires module scripts/styles to have a
-			// browser-compatible type, and fonts must not depend on sniffing.
 			if contentType := assetContentType(c.Path()); contentType != "" {
 				c.Set("Content-Type", contentType)
 			}
@@ -102,18 +109,62 @@ func NewWithOptions(root string, options Options) (*fiber.App, error) {
 		}
 		return assets(c)
 	})
+	if cfg.UploadDir != "" {
+		uploads := static.New(cfg.UploadDir, static.Config{Browse: false, MaxAge: 31536000, ModifyResponse: func(c fiber.Ctx) error {
+			c.Set("Cache-Control", "public, max-age=31536000, immutable")
+			c.Set("Content-Security-Policy", "default-src 'none'; img-src 'self'; sandbox")
+			return nil
+		}})
+		app.Use("/uploads", func(c fiber.Ctx) error {
+			if c.Method() != fiber.MethodGet && c.Method() != fiber.MethodHead {
+				return fiber.ErrMethodNotAllowed
+			}
+			if strings.Contains(c.Path(), "/.") {
+				return fiber.ErrNotFound
+			}
+			return uploads(c)
+		})
+	}
 	routes.Web(deps, app)
-	return app, nil
+	return app, deps, nil
+}
+
+// errorHandler renders HTML error pages for browsers and plain text/JSON for machines.
+func errorHandler(deps *application.Application) fiber.ErrorHandler {
+	return func(c fiber.Ctx, err error) error {
+		code := fiber.StatusInternalServerError
+		var fe *fiber.Error
+		if errors.As(err, &fe) {
+			code = fe.Code
+		}
+		if code >= 500 {
+			log.Printf("%s %s: %v", c.Method(), c.OriginalURL(), err)
+		}
+		p := c.Path()
+		machine := strings.HasPrefix(p, "/api/") || strings.Contains(p, "/llms") || strings.HasSuffix(p, ".xml") || strings.HasSuffix(p, ".txt")
+		if machine {
+			if strings.HasPrefix(p, "/api/") {
+				return c.Status(code).JSON(fiber.Map{"error": http.StatusText(code)})
+			}
+			return c.Status(code).SendString(http.StatusText(code))
+		}
+		if code < 400 || (c.Method() != fiber.MethodGet && c.Method() != fiber.MethodHead && c.Get("X-Inertia") == "") {
+			return c.Status(code).SendString(http.StatusText(code))
+		}
+		if renderErr := deps.ErrorPage(c, code); renderErr != nil {
+			return c.Status(code).SendString(http.StatusText(code))
+		}
+		return nil
+	}
 }
 
 func defaultEnvironment() string {
 	if public.Assets() != nil {
 		return "production"
 	}
-	return "demo"
+	return "development"
 }
 
-// Match Fiber static's repeated URL decoding before checking private paths.
 // Hidden files and parent traversal remain private even through encoded slashes,
 // percent-encoded names, nested encodings or backslash separators.
 func publicAssetPath(assetPath string) bool {
@@ -172,7 +223,5 @@ func assetContentType(assetPath string) string {
 	}
 }
 
-// HTTPHandler exists for net/http-based test tools and embedding only. It
-// traverses the same Fiber app and native router; the standalone server Listen
-// always runs Fiber/fasthttp, so this is not a second backend implementation.
+// HTTPHandler exists for net/http-based test tools and embedding only.
 func HTTPHandler(app *fiber.App) http.Handler { return adaptor.FiberApp(app) }

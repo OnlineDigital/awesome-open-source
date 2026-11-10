@@ -67,5 +67,11 @@
  "error.not_found": "Seite nicht gefunden",
  "error.back_home": "Zurück zur Startseite",
  "seo.home_title": "Awesome Open Source — kuratierte Software mit Demo-Videos und Aktivitäts-Score",
- "seo.home_description": "Entdecke die besten Open-Source-Projekte auf GitHub nach Kategorie, jeweils mit Demo-Video, Screenshots und automatischem Wartungs-Score von 1 bis 5."
+ "seo.home_description": "Entdecke die besten Open-Source-Projekte auf GitHub nach Kategorie, jeweils mit Demo-Video, Screenshots und automatischem Wartungs-Score von 1 bis 5.",
+ "llms.intro": "Verzeichnis für Open-Source-Software. Jeder Eintrag hat eine Kategorie, ein Demo-Video, Screenshots und einen automatischen Wartungs-Score von 1–5 aus der GitHub-Aktivität. Folge den relativen Links: Kategorien verlinken Projekte, Projekte verlinken zurück und auf ähnliche Projekte.",
+ "llms.navigation": "Navigation",
+ "llms.index": "Index",
+ "llms.facts": "Fakten",
+ "llms.description": "Beschreibung",
+ "error.server": "Etwas ist schiefgelaufen"
 }

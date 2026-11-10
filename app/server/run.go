@@ -23,19 +23,23 @@ func RunFromEnvironment() error {
 			return err
 		}
 	}
-	app, err := New(root)
+	app, deps, err := New(root)
 	if err != nil {
 		return err
 	}
+	defer deps.Close()
 	addr := os.Getenv("APP_ADDR")
 	if addr == "" {
 		addr = "127.0.0.1:8080"
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	if deps.Cfg.SyncInterval > 0 {
+		go deps.Syncer.Run(ctx, deps.Cfg.SyncInterval, deps.Cfg.SyncStaleAge, deps.Cfg.SyncBatchSize)
+	}
 	done := make(chan error, 1)
 	go func() {
-		log.Printf("Fiber + inertia-go + Solid on http://%s", addr)
+		log.Printf("%s on http://%s (env=%s)", deps.Cfg.SiteName, addr, deps.Env)
 		done <- app.Listen(addr, fiber.ListenConfig{DisableStartupMessage: true})
 	}()
 	select {

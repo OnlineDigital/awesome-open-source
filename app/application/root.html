@@ -1,10 +1,11 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-locale-placeholder>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="x-seo-head">
 {{ .InertiaHead }}
 {{ vite "resources/js/app.tsx" }}
 </head>
-<body>{{ .InertiaBody }}</body>
+<body>{{ .InertiaBody }}<template id="x-seo-body"></template></body>
 </html>

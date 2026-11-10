@@ -1,243 +1,155 @@
+// Package application is the dependency container shared by every controller.
 package application
 
 import (
+	"context"
 	"crypto/rand"
 	"embed"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"io/fs"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
-	"strconv"
 	"strings"
-	"sync"
+	"time"
 
-	bridge "github.com/andreitelteu/inertia-go-solid-template/app/inertia"
+	"awesomeopensource.dev/app/config"
+	"awesomeopensource.dev/app/db"
+	vec "awesomeopensource.dev/app/embed"
+	"awesomeopensource.dev/app/github"
+	"awesomeopensource.dev/app/i18n"
+	"awesomeopensource.dev/app/search"
+	"awesomeopensource.dev/app/store"
+	"awesomeopensource.dev/app/syncer"
+	"awesomeopensource.dev/app/translate"
 	upstream "github.com/inertia-go/inertia-go"
 	"github.com/inertia-go/inertia-go/session"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"golang.org/x/crypto/bcrypt"
 )
 
 //go:embed root.html
 var views embed.FS
 
-type RequestRecord struct {
-	Path    string `json:"path"`
-	Method  string `json:"method"`
-	Purpose string `json:"purpose"`
-	Only    string `json:"only"`
-	Except  string `json:"except"`
-}
-type Stats struct {
-	Requests    []RequestRecord `json:"requests"`
-	Evaluations map[string]int  `json:"evaluations"`
-}
-
-// Application contains the dependencies shared by controller factories. Nothing
-// is a package global, so tests and multiple server instances remain isolated.
 type Application struct {
-	Adapter   *upstream.Inertia
-	Encrypted *upstream.Inertia
-	Cleared   *upstream.Inertia
-	Assets    Assets
-	Session   *captureStore
-	Demo      bool
-	// The route table supplies these helpers after controller dependencies exist.
+	Cfg     config.Config
+	Env     string
+	Key     []byte
+	Adapter *upstream.Inertia
+	Assets  Assets
+	Session *captureStore
+
+	Pool       *pgxpool.Pool
+	Store      *store.Store
+	I18n       *i18n.Bundle
+	Search     *search.Client
+	Indexer    *search.Indexer
+	Translator *translate.Translator
+	Embedder   *vec.Client
+	GitHub     *github.Client
+	Syncer     *syncer.Syncer
+
 	RouteURL  func(string, map[string]string, url.Values) (string, error)
 	RouteList func() any
-	mu        sync.Mutex
-	stats     Stats
+
+	limiter *rateLimiter
 }
 
-func New(root, env, devServer string, demo bool) (*Application, error) {
-	return NewWithAssets(root, env, devServer, demo, nil)
+// NewCore connects to PostgreSQL, applies migrations and wires every service.
+// It needs neither the frontend build nor a session key, so CLI commands use it directly.
+func NewCore(cfg config.Config) (*Application, error) {
+	bundle, err := i18n.Load(cfg.DefaultLocale, cfg.Locales)
+	if err != nil {
+		return nil, err
+	}
+	ctx := context.Background()
+	pool, err := db.Open(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return nil, err
+	}
+	applied, err := db.Migrate(ctx, pool)
+	if err != nil {
+		pool.Close()
+		return nil, err
+	}
+	for _, m := range applied {
+		log.Printf("applied migration %s", m)
+	}
+	a := &Application{Cfg: cfg, Env: cfg.Env, Pool: pool, I18n: bundle, limiter: newRateLimiter(8, 15*60)}
+	a.Store = store.New(pool, cfg.DefaultLocale)
+	a.Search = search.NewClient(cfg.TypesenseURL, cfg.TypesenseKey, cfg.TypesensePrefix)
+	a.Indexer = &search.Indexer{Client: a.Search, Store: a.Store, Locales: bundle.Locales}
+	a.Translator = translate.New(cfg.AnthropicKey, cfg.AnthropicModel)
+	if cfg.EmbeddingsURL != "" {
+		a.Embedder = vec.New(cfg.EmbeddingsURL, cfg.EmbeddingsKey, cfg.EmbeddingsModel)
+	}
+	a.GitHub = github.New(cfg.GitHubToken)
+	a.Syncer = &syncer.Syncer{Store: a.Store, GitHub: a.GitHub, Index: a.Indexer, Embed: a.Embedder, Delay: 300 * time.Millisecond}
+	return a, nil
 }
 
-// NewWithAssets keeps deployment assets injectable without changing controller
-// dependencies or the native Inertia protocol. assetFS is rooted at Vite build.
-func NewWithAssets(root, env, devServer string, demo bool, assetFS fs.FS) (*Application, error) {
-	assets, err := LoadAssetsFS(root, env, devServer, assetFS)
+// New builds the web application: core services, session key, Vite assets and the Inertia adapter.
+func New(root string, cfg config.Config, devServer string, assetFS fs.FS) (*Application, error) {
+	assets, err := LoadAssetsFS(root, cfg.Env, devServer, assetFS)
 	if err != nil {
 		return nil, err
 	}
 	key := make([]byte, 32)
 	if configured := os.Getenv("APP_KEY"); configured != "" {
-		key, err = hex.DecodeString(configured)
-		if err != nil || len(key) != 32 {
+		if key, err = hex.DecodeString(configured); err != nil || len(key) != 32 {
 			return nil, fmt.Errorf("APP_KEY must contain 64 hexadecimal characters (32 bytes)")
 		}
 	} else {
-		if env == "production" {
-			return nil, fmt.Errorf("APP_KEY is required in production; generate with openssl rand -hex 32")
+		if cfg.Env == "production" {
+			return nil, fmt.Errorf("APP_KEY is required in production; generate with ./artisan key:generate")
 		}
 		if _, err = rand.Read(key); err != nil {
-			return nil, fmt.Errorf("generate session key: %w", err)
+			return nil, err
 		}
 	}
-	store, err := session.NewCookie(session.CookieOptions{Name: "solid_flash", Keys: [][]byte{key}, HTTPOnly: true, Secure: env == "production", SameSite: http.SameSiteLaxMode, MaxAge: 120})
+	a, err := NewCore(cfg)
 	if err != nil {
 		return nil, err
 	}
-	a := &Application{Assets: assets, Demo: demo, Session: &captureStore{store: store}}
-	a.Reset()
-	cfg := upstream.Config{RootView: "root.html", TemplateFS: views, Version: assets.Version, Session: a.Session, Vite: assets}
-	create := func(config upstream.Config) (*upstream.Inertia, error) {
-		i, err := upstream.New(config)
-		if err == nil {
-			i.ShareValue("shared", upstream.Always(map[string]any{"app": upstream.Always("compat-lab")}))
-		}
-		return i, err
-	}
-	if a.Adapter, err = create(cfg); err != nil {
+	a.Key, a.Assets = key, assets
+	flash, err := session.NewCookie(session.CookieOptions{Name: "aos_flash", Keys: [][]byte{key}, HTTPOnly: true, Secure: cfg.Env == "production", SameSite: http.SameSiteLaxMode, MaxAge: 120})
+	if err != nil {
 		return nil, err
 	}
-	cfg.EncryptHistory = true
-	if a.Encrypted, err = create(cfg); err != nil {
+	a.Session = &captureStore{store: flash}
+	if err := a.BootstrapAdmin(context.Background()); err != nil {
 		return nil, err
 	}
-	cfg.EncryptHistory = false
-	cfg.ClearHistory = true
-	if a.Cleared, err = create(cfg); err != nil {
+	a.Adapter, err = upstream.New(upstream.Config{RootView: "root.html", TemplateFS: views, Version: assets.Version, Session: a.Session, Vite: assets})
+	if err != nil {
 		return nil, err
 	}
 	return a, nil
 }
 
-func (a *Application) Render(w http.ResponseWriter, r *http.Request, component string, props upstream.Props) {
-	a.RenderWith(a.Adapter, w, r, component, props)
-}
-func (a *Application) RenderWith(adapter *upstream.Inertia, w http.ResponseWriter, r *http.Request, component string, props upstream.Props) {
-	state := messagesFrom(r)
-	if _, exists := props["errors"]; !exists {
-		errors := map[string]any{}
-		for key, value := range state.errors {
-			errors[key] = value
-		}
-		if bag := upstream.FromRequest(r).ErrorBag; bag != "" && len(errors) > 0 {
-			errors = map[string]any{bag: errors}
-		}
-		props["errors"] = upstream.Always(errors)
-	}
-	// The pinned native adapter consumes flash on stale-version responses.
-	// Keep the messages for the client's subsequent full browser navigation.
-	info := upstream.FromRequest(r)
-	if info.IsInertia && r.Method == http.MethodGet && info.Version != "" && info.Version != a.Assets.Version {
-		bag := info.ErrorBag
-		if bag == "" {
-			bag = "default"
-		}
-		_ = a.Session.FlashErrors(w, r, bag, state.errors)
-		for key, value := range state.flash {
-			_ = a.Session.FlashMessage(w, r, key, value)
-		}
-	}
-	bridge.Render(adapter, a.Assets.Version, w, r, component, props)
-}
+func (a *Application) Close() { a.Pool.Close() }
 
-// RedirectForm explicitly uses 303 for every mutation, including POST. Errors
-// are persisted into the native encrypted flash store, not query parameters.
-func (a *Application) RedirectForm(w http.ResponseWriter, r *http.Request, errors map[string]string) {
-	bag := r.Header.Get("X-Inertia-Error-Bag")
-	if bag == "" {
-		bag = "default"
-	}
-	if len(errors) > 0 {
-		if err := a.Session.FlashErrors(w, r, bag, errors); err != nil {
-			http.Error(w, "Cannot save validation errors", 500)
-			return
+// BootstrapAdmin creates or updates the admin account from ADMIN_EMAIL / ADMIN_PASSWORD.
+func (a *Application) BootstrapAdmin(ctx context.Context) error {
+	email, pass := strings.TrimSpace(a.Cfg.AdminEmail), a.Cfg.AdminPassword
+	if email == "" || pass == "" {
+		n, err := a.Store.CountAdmins(ctx)
+		if err != nil {
+			return err
 		}
-	} else {
-		if err := a.Session.FlashMessage(w, r, "success", "Form accepted"); err != nil {
-			http.Error(w, "Cannot save confirmation", 500)
-			return
+		if n == 0 {
+			log.Printf("no admin user yet: set ADMIN_EMAIL and ADMIN_PASSWORD (or run `go run . admin:create`) to enable /admin")
 		}
+		return nil
 	}
-	http.Redirect(w, r, "/form", http.StatusSeeOther)
-}
-
-func (a *Application) Reset() {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	a.stats = Stats{Requests: []RequestRecord{}, Evaluations: map[string]int{}}
-	for _, key := range []string{"users", "companies", "optional", "slow", "second", "lookup", "items", "tick", "auth.notifications"} {
-		a.stats.Evaluations[key] = 0
+	if a.Env == "production" && len(pass) < 12 {
+		return fmt.Errorf("ADMIN_PASSWORD must have at least 12 characters in production")
 	}
-}
-func (a *Application) Snapshot() Stats {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	s := Stats{Requests: append([]RequestRecord{}, a.stats.Requests...), Evaluations: map[string]int{}}
-	for key, value := range a.stats.Evaluations {
-		s.Evaluations[key] = value
+	hash, err := bcrypt.GenerateFromPassword([]byte(pass), bcrypt.DefaultCost)
+	if err != nil {
+		return err
 	}
-	return s
-}
-func (a *Application) Count(key string) int {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	a.stats.Evaluations[key]++
-	return a.stats.Evaluations[key]
-}
-func (a *Application) Callback(key string, value any) func() (any, error) {
-	return func() (any, error) { a.Count(key); return value, nil }
-}
-func (a *Application) Record(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if a.Demo {
-			a.mu.Lock()
-			a.stats.Requests = append(a.stats.Requests, RequestRecord{r.URL.RequestURI(), r.Method, r.Header.Get("Purpose"), r.Header.Get("X-Inertia-Partial-Data"), r.Header.Get("X-Inertia-Partial-Except")})
-			if len(a.stats.Requests) > 1000 {
-				a.stats.Requests = a.stats.Requests[len(a.stats.Requests)-1000:]
-			}
-			a.mu.Unlock()
-		}
-		next.ServeHTTP(w, r)
-	})
-}
-func WriteJSON(w http.ResponseWriter, value any) {
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(value)
-}
-func PageNumber(r *http.Request) int {
-	n, _ := strconv.Atoi(r.URL.Query().Get("page"))
-	if n < 1 {
-		n = 1
-	}
-	return n
-}
-func Rows(n int) []map[string]any {
-	return []map[string]any{{"id": n, "name": fmt.Sprintf("item-%d", n)}}
-}
-func ReadName(w http.ResponseWriter, r *http.Request) (string, error) {
-	r.Body = http.MaxBytesReader(w, r.Body, 8<<20)
-	if strings.Contains(r.Header.Get("Content-Type"), "application/json") {
-		var payload map[string]any
-		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-			return "", err
-		}
-		name, _ := payload["name"].(string)
-		return name, nil
-	}
-	if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
-		if err := r.ParseMultipartForm(1 << 20); err != nil {
-			return "", err
-		}
-		if r.MultipartForm != nil {
-			defer r.MultipartForm.RemoveAll()
-		}
-		return r.FormValue("name"), nil
-	}
-	if err := r.ParseForm(); err != nil {
-		return "", err
-	}
-	return r.FormValue("name"), nil
-}
-
-func PageNumberFromQuery(page string) int {
-	n, _ := strconv.Atoi(page)
-	if n < 1 {
-		n = 1
-	}
-	return n
+	return a.Store.UpsertAdmin(ctx, email, string(hash))
 }

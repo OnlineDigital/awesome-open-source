@@ -67,5 +67,11 @@
  "error.not_found": "Page introuvable",
  "error.back_home": "Retour à l'accueil",
  "seo.home_title": "Awesome Open Source — logiciels sélectionnés avec vidéos de démo et score d'activité",
- "seo.home_description": "Découvrez les meilleurs projets open source de GitHub par catégorie, avec vidéo de démo, captures d'écran et un score de maintenance automatique de 1 à 5."
+ "seo.home_description": "Découvrez les meilleurs projets open source de GitHub par catégorie, avec vidéo de démo, captures d'écran et un score de maintenance automatique de 1 à 5.",
+ "llms.intro": "Annuaire de logiciels open source. Chaque entrée a une catégorie, une vidéo de démo, des captures et un score automatique de 1 à 5 basé sur l'activité GitHub. Suivez les liens relatifs : les catégories mènent aux projets, et les projets renvoient aux catégories et aux projets similaires.",
+ "llms.navigation": "Navigation",
+ "llms.index": "Index",
+ "llms.facts": "Informations",
+ "llms.description": "Description",
+ "error.server": "Une erreur est survenue"
 }

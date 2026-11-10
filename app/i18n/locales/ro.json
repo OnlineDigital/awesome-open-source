@@ -67,5 +67,11 @@
  "error.not_found": "Pagina nu a fost găsită",
  "error.back_home": "Înapoi la prima pagină",
  "seo.home_title": "Awesome Open Source — software selectat, cu video demo și scor de activitate",
- "seo.home_description": "Descoperă cele mai bune proiecte open source de pe GitHub, grupate pe categorii, fiecare cu video demo, capturi de ecran și un scor automat de mentenanță de la 1 la 5."
+ "seo.home_description": "Descoperă cele mai bune proiecte open source de pe GitHub, grupate pe categorii, fiecare cu video demo, capturi de ecran și un scor automat de mentenanță de la 1 la 5.",
+ "llms.intro": "Director de software open source. Fiecare intrare are categorie, video demo, capturi de ecran și un scor automat 1-5 de mentenanță calculat din activitatea GitHub. Urmează link-urile relative de mai jos: listele de categorii duc la paginile proiectelor, iar paginile proiectelor duc înapoi și la proiecte similare.",
+ "llms.navigation": "Navigare",
+ "llms.index": "Index",
+ "llms.facts": "Informații",
+ "llms.description": "Descriere",
+ "error.server": "Ceva nu a mers bine"
 }

@@ -67,5 +67,11 @@
  "error.not_found": "Page not found",
  "error.back_home": "Back to the homepage",
  "seo.home_title": "Awesome Open Source — curated software with demo videos and activity scores",
- "seo.home_description": "Discover the best open source projects on GitHub, grouped by category, each with a demo video, screenshots and an automatic maintenance score from 1 to 5."
+ "seo.home_description": "Discover the best open source projects on GitHub, grouped by category, each with a demo video, screenshots and an automatic maintenance score from 1 to 5.",
+ "llms.intro": "Open source software directory. Each entry has a category, a demo video, screenshots and an automatic 1-5 maintenance score computed from GitHub activity. Follow the relative links below: category lists link to project pages, and project pages link back and to similar projects.",
+ "llms.navigation": "Navigation",
+ "llms.index": "Index",
+ "llms.facts": "Facts",
+ "llms.description": "Description",
+ "error.server": "Something went wrong"
 }

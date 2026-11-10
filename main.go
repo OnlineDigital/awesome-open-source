@@ -5,8 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/andreitelteu/inertia-go-solid-template/app/server"
-	"github.com/andreitelteu/inertia-go-solid-template/internal/artisan"
+	"awesomeopensource.dev/app/server"
+	"awesomeopensource.dev/internal/artisan"
 )
 
 func main() {

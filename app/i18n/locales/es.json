@@ -67,5 +67,11 @@
  "error.not_found": "Página no encontrada",
  "error.back_home": "Volver al inicio",
  "seo.home_title": "Awesome Open Source — software seleccionado con vídeos demo y puntuación de actividad",
- "seo.home_description": "Descubre los mejores proyectos de código abierto de GitHub por categoría, con vídeo demo, capturas y una puntuación automática de mantenimiento de 1 a 5."
+ "seo.home_description": "Descubre los mejores proyectos de código abierto de GitHub por categoría, con vídeo demo, capturas y una puntuación automática de mantenimiento de 1 a 5.",
+ "llms.intro": "Directorio de software de código abierto. Cada entrada tiene categoría, vídeo demo, capturas y una puntuación automática de 1 a 5 según la actividad en GitHub. Sigue los enlaces relativos: las categorías enlazan a los proyectos y estos enlazan de vuelta y a proyectos similares.",
+ "llms.navigation": "Navegación",
+ "llms.index": "Índice",
+ "llms.facts": "Datos",
+ "llms.description": "Descripción",
+ "error.server": "Algo salió mal"
 }

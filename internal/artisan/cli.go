@@ -15,10 +15,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/andreitelteu/inertia-go-solid-template/app/server"
+	"awesomeopensource.dev/app/server"
 )
 
-const help = `inertia-go-solid-template artisan
+const help = `awesomeopensource.dev artisan
 
   help, list                 Show commands
   install                    npm ci and go mod download
@@ -30,8 +30,16 @@ const help = `inertia-go-solid-template artisan
                              Run the built executable (default: production)
   serve [--host HOST --port N --env ENV]
                              Serve this executable directly
-  test                       Run npm test
-  route:list, routes         Print the named route registry (no build required)
+  test                       Run Go tests and the TypeScript check
+  migrate                    Apply database migrations
+  admin:create EMAIL         Create/update an admin (password from ADMIN_PASSWORD or prompt-free --password)
+  import FILE|-              Add GitHub repos (one URL or owner/repo per line) as draft projects
+         [--category SLUG]
+  sync [--all] [--id N]      Refresh GitHub data + activity scores for stale (or all) projects
+  search:reindex             Rebuild the Typesense collections
+  translate [--locale xx --all --id N]
+                             Machine-translate missing project/category texts (needs ANTHROPIC_API_KEY)
+  embed                      Create pgvector embeddings for published projects
   key:generate [--force]      Write APP_KEY to .env without printing it
   make:controller Name [--action index_page,store_form]
                              One snake_case file per action
@@ -191,7 +199,9 @@ func Run(args []string, out io.Writer) error {
 			return fmt.Errorf("build first with ./artisan build: %w", err)
 		}
 		return execute(root, binary, nil, nil, out)
-	case "install", "test", "routes", "route:list", "about":
+	case "migrate", "admin:create", "import", "sync", "search:reindex", "translate", "embed":
+		return runConsole(command, rest, out)
+	case "install", "test", "about":
 		if len(rest) != 0 {
 			return fmt.Errorf("%s accepts no arguments", command)
 		}
@@ -202,11 +212,12 @@ func Run(args []string, out io.Writer) error {
 			}
 			return execute(root, "go", []string{"mod", "download"}, nil, out)
 		case "test":
-			return execute(root, "npm", []string{"test"}, nil, out)
-		case "routes", "route:list":
-			return printRoutes(out)
+			if err = execute(root, "go", []string{"test", "-buildvcs=false", "./..."}, nil, out); err != nil {
+				return err
+			}
+			return execute(root, "npm", []string{"run", "typecheck"}, nil, out)
 		default:
-			_, err = fmt.Fprintf(out, "inertia-go-solid-template\nGo: %s\nPlatform: %s/%s\nRoot: %s\n", runtime.Version(), runtime.GOOS, runtime.GOARCH, root)
+			_, err = fmt.Fprintf(out, "awesomeopensource.dev\nGo: %s\nPlatform: %s/%s\nRoot: %s\n", runtime.Version(), runtime.GOOS, runtime.GOARCH, root)
 			return err
 		}
 	default:

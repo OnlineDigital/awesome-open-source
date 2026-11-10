@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/andreitelteu/inertia-go-solid-template/app/server"
+	"awesomeopensource.dev/app/server"
 	"log"
 )
 

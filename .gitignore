@@ -20,3 +20,4 @@ reports/template-artisan-smoke.json
 reports/template-publish-smoke.json
 *.log
 .DS_Store
+data/
