@@ -1,0 +1,68 @@
+name: Native template checks
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  native:
+    name: Native build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: go test -buildvcs=false ./...
+      - run: go run -buildvcs=false . artisan build
+      - name: POSIX launcher
+        if: runner.os != 'Windows'
+        shell: bash
+        run: ./artisan about
+      - name: Windows launchers
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          .\artisan.cmd about
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          .\artisan.ps1 route:list
+      - run: npm run test:portable
+      - run: go test -buildvcs=false -tags production ./...
+      - run: go run -buildvcs=false . artisan route:list
+
+  browser:
+    name: Chromium and race detector
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: go run -buildvcs=false . artisan test
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: browser-failures
+          path: |
+            test-results/
+            reports/template-browser-results.json
+            reports/template-checks.json

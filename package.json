@@ -1,0 +1,35 @@
+{
+  "name": "inertia-go-solid-template",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "description": "Reusable inertia-go and SolidJS template with tested feature demos",
+  "scripts": {
+    "dev": "go run -buildvcs=false . artisan dev",
+    "build": "vite build",
+    "build:frontend": "vite build",
+    "start": "go run -buildvcs=false . artisan start",
+    "typecheck": "tsc",
+    "test": "node scripts/test.mjs",
+    "test:go": "go test -buildvcs=false -race ./...",
+    "test:browser": "go run -buildvcs=false . artisan build && playwright test",
+    "report": "node scripts/report.mjs",
+    "test:portable": "node scripts/smoke.mjs"
+  },
+  "dependencies": {
+    "@inertiajs/core": "3.8.0",
+    "@solidjs/meta": "0.29.4",
+    "inertia-adapter-solid": "1.0.0-beta.9",
+    "solid-js": "1.9.15"
+  },
+  "devDependencies": {
+    "@inertiajs/vite": "3.8.0",
+    "@playwright/test": "1.63.0",
+    "@types/node": "24.19.1",
+    "typescript": "5.9.2",
+    "vite": "7.3.6",
+    "vite-plugin-solid": "2.11.8"
+  }
+}
