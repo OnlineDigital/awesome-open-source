@@ -102,18 +102,16 @@ func (a *Application) SameOrigin(c fiber.Ctx) error {
 	}
 	if origin := c.Get("Origin"); origin != "" {
 		u, err := url.Parse(origin)
-		if err != nil || !strings.EqualFold(u.Host, c.Hostname()+portSuffix(c)) && !strings.EqualFold(u.Host, string(c.Request().Header.Host())) {
+		if err != nil {
+			return fiber.NewError(fiber.StatusForbidden, "cross-origin request rejected")
+		}
+		// Accept the host the request was sent to, or the configured public URL (behind reverse proxies).
+		public, _ := url.Parse(a.Cfg.BaseURL)
+		if !strings.EqualFold(u.Host, c.Host()) && (public == nil || !strings.EqualFold(u.Host, public.Host)) {
 			return fiber.NewError(fiber.StatusForbidden, "cross-origin request rejected")
 		}
 	}
 	return c.Next()
-}
-
-func portSuffix(c fiber.Ctx) string {
-	if p := c.Port(); p != "" && p != "80" && p != "443" {
-		return ":" + p
-	}
-	return ""
 }
 
 func (a *Application) AllowLogin(c fiber.Ctx) bool { return a.limiter.Allow(c.IP()) }

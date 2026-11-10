@@ -39,7 +39,8 @@ SELECT p.id, p.slug, p.github_owner, p.github_repo, p.category_id, COALESCE(c.sl
   p.homepage, p.license, p.language, p.topics, p.avatar_url, p.stars, p.forks, p.open_issues, p.archived, p.default_branch,
   p.pushed_at, p.last_commit_at, p.last_release_at, p.last_release_tag,
   p.activity_score::float8, p.activity_tier::int, p.score_breakdown, p.youtube_id, p.status, p.featured, p.synced_at, p.sync_error, p.created_at, p.updated_at,
-  COALESCE(NULLIF(t.tagline,''), d.tagline, ''), COALESCE(NULLIF(t.description,''), d.description, ''), COALESCE(t.source = 'machine' AND t.tagline <> '', false)
+  COALESCE(NULLIF(t.tagline,''), d.tagline, ''), COALESCE(NULLIF(t.description,''), d.description, ''), COALESCE(t.source = 'machine' AND t.tagline <> '', false),
+  COALESCE(t.tagline <> '' OR t.description <> '', false)
 FROM projects p
 LEFT JOIN project_translations t ON t.project_id = p.id AND t.locale = $1
 LEFT JOIN project_translations d ON d.project_id = p.id AND d.locale = $2
@@ -54,7 +55,7 @@ func scanProject(row pgx.Row) (*Project, error) {
 		&p.Homepage, &p.License, &p.Language, &p.Topics, &p.AvatarURL, &p.Stars, &p.Forks, &p.OpenIssues, &p.Archived, &p.DefaultBranch,
 		&p.PushedAt, &p.LastCommitAt, &p.LastReleaseAt, &p.LastReleaseTag,
 		&p.Score, &p.Tier, &breakdown, &p.YouTubeID, &p.Status, &p.Featured, &p.SyncedAt, &p.SyncError, &p.CreatedAt, &p.UpdatedAt,
-		&p.Tagline, &p.Description, &p.Machine)
+		&p.Tagline, &p.Description, &p.Machine, &p.Translated)
 	if err != nil {
 		return nil, err
 	}
@@ -474,4 +475,42 @@ func (s *Store) UpsertAdmin(ctx context.Context, email, hash string) error {
 func (s *Store) CountAdmins(ctx context.Context) (n int, err error) {
 	err = s.DB.QueryRow(ctx, `SELECT count(*) FROM admin_users`).Scan(&n)
 	return
+}
+
+// ProjectLocales maps published project ids to the non-default locales that have real translated text.
+func (s *Store) ProjectLocales(ctx context.Context) (map[int64][]string, error) {
+	rows, err := s.DB.Query(ctx, `SELECT t.project_id, t.locale FROM project_translations t JOIN projects p ON p.id = t.project_id
+		WHERE p.status='published' AND t.locale <> $1 AND (t.tagline <> '' OR t.description <> '') ORDER BY t.project_id, t.locale`, s.DefaultLocale)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[int64][]string{}
+	for rows.Next() {
+		var id int64
+		var loc string
+		if err := rows.Scan(&id, &loc); err != nil {
+			return nil, err
+		}
+		out[id] = append(out[id], loc)
+	}
+	return out, rows.Err()
+}
+
+// ProjectTranslatedLocales lists the non-default locales with text for one project.
+func (s *Store) ProjectTranslatedLocales(ctx context.Context, id int64) ([]string, error) {
+	rows, err := s.DB.Query(ctx, `SELECT locale FROM project_translations WHERE project_id=$1 AND locale <> $2 AND (tagline <> '' OR description <> '') ORDER BY locale`, id, s.DefaultLocale)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var l string
+		if err := rows.Scan(&l); err != nil {
+			return nil, err
+		}
+		out = append(out, l)
+	}
+	return out, rows.Err()
 }

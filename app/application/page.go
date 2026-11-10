@@ -55,6 +55,27 @@ func (a *Application) Alternates(path string) []seo.Alternate {
 	return append(out, seo.Alternate{Locale: "x-default", URL: a.Abs(a.Cfg.DefaultLocale, path)})
 }
 
+// AlternatesIn lists hreflang links for the default locale plus the given translated locales.
+func (a *Application) AlternatesIn(path string, translated []string) []seo.Alternate {
+	has := map[string]bool{a.Cfg.DefaultLocale: true}
+	for _, l := range translated {
+		has[l] = true
+	}
+	out := make([]seo.Alternate, 0, len(has)+1)
+	for _, loc := range a.I18n.Locales {
+		if has[loc] {
+			out = append(out, seo.Alternate{Locale: loc, URL: a.Abs(loc, path)})
+		}
+	}
+	return append(out, seo.Alternate{Locale: "x-default", URL: a.Abs(a.Cfg.DefaultLocale, path)})
+}
+
+// Untranslated points a fallback-language page at the default locale and keeps it out of the index.
+func (a *Application) Untranslated(m *seo.Meta, path string) {
+	m.Canonical = a.Abs(a.Cfg.DefaultLocale, path)
+	m.Robots = "noindex,follow"
+}
+
 // NewMeta returns SEO metadata prefilled with canonical, alternates and site defaults.
 func (a *Application) NewMeta(locale, path, title, description string) *seo.Meta {
 	return &seo.Meta{

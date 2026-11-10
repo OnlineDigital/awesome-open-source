@@ -7,7 +7,8 @@ import (
 
 const categorySelect = `
 SELECT c.id, c.slug, c.icon, c.sort_order, COALESCE(NULLIF(ct.name,''), cd.name, c.slug), COALESCE(NULLIF(ct.description,''), cd.description, ''),
-  (SELECT count(*) FROM projects p WHERE p.category_id = c.id AND p.status = 'published')
+  (SELECT count(*) FROM projects p WHERE p.category_id = c.id AND p.status = 'published'),
+  COALESCE(ct.name <> '', false)
 FROM categories c
 LEFT JOIN category_translations ct ON ct.category_id = c.id AND ct.locale = $1
 LEFT JOIN category_translations cd ON cd.category_id = c.id AND cd.locale = $2`
@@ -21,7 +22,7 @@ func (s *Store) ListCategories(ctx context.Context, locale string) ([]Category, 
 	out := []Category{}
 	for rows.Next() {
 		var c Category
-		if err := rows.Scan(&c.ID, &c.Slug, &c.Icon, &c.SortOrder, &c.Name, &c.Description, &c.ProjectCount); err != nil {
+		if err := rows.Scan(&c.ID, &c.Slug, &c.Icon, &c.SortOrder, &c.Name, &c.Description, &c.ProjectCount, &c.Translated); err != nil {
 			return nil, err
 		}
 		out = append(out, c)
@@ -32,7 +33,7 @@ func (s *Store) ListCategories(ctx context.Context, locale string) ([]Category, 
 func (s *Store) CategoryBySlug(ctx context.Context, slug, locale string) (*Category, error) {
 	var c Category
 	err := s.DB.QueryRow(ctx, categorySelect+` WHERE c.slug = $3`, s.loc(locale), s.DefaultLocale, slug).
-		Scan(&c.ID, &c.Slug, &c.Icon, &c.SortOrder, &c.Name, &c.Description, &c.ProjectCount)
+		Scan(&c.ID, &c.Slug, &c.Icon, &c.SortOrder, &c.Name, &c.Description, &c.ProjectCount, &c.Translated)
 	if err != nil {
 		return nil, err
 	}
@@ -42,7 +43,7 @@ func (s *Store) CategoryBySlug(ctx context.Context, slug, locale string) (*Categ
 func (s *Store) CategoryByID(ctx context.Context, id int64, locale string) (*Category, error) {
 	var c Category
 	err := s.DB.QueryRow(ctx, categorySelect+` WHERE c.id = $3`, s.loc(locale), s.DefaultLocale, id).
-		Scan(&c.ID, &c.Slug, &c.Icon, &c.SortOrder, &c.Name, &c.Description, &c.ProjectCount)
+		Scan(&c.ID, &c.Slug, &c.Icon, &c.SortOrder, &c.Name, &c.Description, &c.ProjectCount, &c.Translated)
 	if err != nil {
 		return nil, err
 	}
@@ -99,4 +100,23 @@ func (s *Store) SaveCategory(ctx context.Context, c Category, trs []CategoryTran
 func (s *Store) DeleteCategory(ctx context.Context, id int64) error {
 	_, err := s.DB.Exec(ctx, `DELETE FROM categories WHERE id=$1`, id)
 	return err
+}
+
+// CategoryLocales maps category ids to the non-default locales that have a translated name.
+func (s *Store) CategoryLocales(ctx context.Context) (map[int64][]string, error) {
+	rows, err := s.DB.Query(ctx, `SELECT category_id, locale FROM category_translations WHERE locale <> $1 AND name <> '' ORDER BY category_id, locale`, s.DefaultLocale)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[int64][]string{}
+	for rows.Next() {
+		var id int64
+		var loc string
+		if err := rows.Scan(&id, &loc); err != nil {
+			return nil, err
+		}
+		out[id] = append(out[id], loc)
+	}
+	return out, rows.Err()
 }

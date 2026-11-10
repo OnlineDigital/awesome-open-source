@@ -36,18 +36,29 @@ func Index(app *application.Application) fiber.Handler {
 	}
 }
 
-// alternates returns one URL entry per locale for a canonical path.
-func entries(app *application.Application, path string, mod time.Time) []seo.SitemapURL {
+// entries returns one URL entry per translated locale for a canonical path.
+// A nil translated list means every locale (pages that only use UI strings).
+func entries(app *application.Application, path string, mod time.Time, translated []string, all bool) []seo.SitemapURL {
 	var out []seo.SitemapURL
 	alts := app.Alternates(path)
-	for _, loc := range app.I18n.Locales {
+	locales := app.I18n.Locales
+	if !all {
+		alts = app.AlternatesIn(path, translated)
+		locales = locales[:0:0]
+		for _, a := range alts {
+			if a.Locale != "x-default" {
+				locales = append(locales, a.Locale)
+			}
+		}
+	}
+	for _, loc := range locales {
 		out = append(out, seo.SitemapURL{Loc: app.Abs(loc, path), LastMod: mod, Alternates: alts})
 	}
 	return out
 }
 
 func Pages(app *application.Application) fiber.Handler {
-	return func(c fiber.Ctx) error { return xml(c, seo.URLSet(entries(app, "/", time.Now()))) }
+	return func(c fiber.Ctx) error { return xml(c, seo.URLSet(entries(app, "/", time.Now(), nil, true))) }
 }
 
 func Categories(app *application.Application) fiber.Handler {
@@ -56,10 +67,14 @@ func Categories(app *application.Application) fiber.Handler {
 		if err != nil {
 			return err
 		}
+		locs, err := app.Store.CategoryLocales(c.Context())
+		if err != nil {
+			return err
+		}
 		var urls []seo.SitemapURL
 		for _, cat := range cats {
 			if cat.ProjectCount > 0 {
-				urls = append(urls, entries(app, "/category/"+cat.Slug, time.Now())...)
+				urls = append(urls, entries(app, "/category/"+cat.Slug, time.Now(), locs[cat.ID], false)...)
 			}
 		}
 		return xml(c, seo.URLSet(urls))
@@ -69,6 +84,10 @@ func Categories(app *application.Application) fiber.Handler {
 func Projects(app *application.Application) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		ctx := c.Context()
+		locs, err := app.Store.ProjectLocales(ctx)
+		if err != nil {
+			return err
+		}
 		var urls []seo.SitemapURL
 		for offset := 0; ; offset += 200 {
 			ps, err := page(ctx, app, offset)
@@ -81,7 +100,7 @@ func Projects(app *application.Application) fiber.Handler {
 				for _, s := range p.Screenshots {
 					imgs = append(imgs, app.Cfg.BaseURL+s.Path)
 				}
-				for _, e := range entries(app, path, p.UpdatedAt) {
+				for _, e := range entries(app, path, p.UpdatedAt, locs[p.ID], false) {
 					e.Images = imgs
 					if p.YouTubeID != "" {
 						e.Video = &seo.SitemapVideo{Thumbnail: application.YouTubeThumb(p.YouTubeID), Title: p.FullName + " demo", Description: firstNonEmpty(p.Tagline, p.FullName),

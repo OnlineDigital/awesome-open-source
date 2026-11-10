@@ -65,6 +65,12 @@ func Show(app *application.Application) fiber.Handler {
 			meta.Robots = "noindex,follow" // filtered/sorted views duplicate the canonical list
 			meta.Canonical = app.Abs(loc, path)
 		}
+		if locs, err := app.Store.CategoryLocales(ctx); err == nil {
+			meta.Alternates = app.AlternatesIn(path, locs[cat.ID])
+		}
+		if loc != app.Cfg.DefaultLocale && !cat.Translated {
+			app.Untranslated(meta, path)
+		}
 		meta.Markdown = app.Cfg.BaseURL + app.Path(loc, "/llms/category/"+cat.Slug+".txt")
 		cards := app.Cards(ps, loc)
 		items := make([]seo.ListItem, 0, len(cards))

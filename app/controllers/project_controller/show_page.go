@@ -40,6 +40,14 @@ func Show(app *application.Application) fiber.Handler {
 		}
 		meta := app.NewMeta(loc, path, title, seo.Truncate(desc, 160))
 		meta.OGType = "article"
+		translated, err := app.Store.ProjectTranslatedLocales(ctx, p.ID)
+		if err != nil {
+			return err
+		}
+		meta.Alternates = app.AlternatesIn(path, translated)
+		if loc != app.Cfg.DefaultLocale && !p.Translated {
+			app.Untranslated(meta, path)
+		}
 		meta.Markdown = base + app.Path(loc, "/llms/"+p.Slug+".md")
 
 		var shots []string

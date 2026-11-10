@@ -44,6 +44,7 @@ type Project struct {
 	Tagline     string `json:"tagline"`
 	Description string `json:"description"`
 	Machine     bool   `json:"machineTranslated"`
+	Translated  bool   `json:"translated"` // text exists in the requested locale (not a fallback)
 
 	Screenshots []Screenshot `json:"screenshots,omitempty"`
 }
@@ -71,6 +72,7 @@ type Category struct {
 	Name         string `json:"name"`
 	Description  string `json:"description"`
 	ProjectCount int    `json:"projectCount"`
+	Translated   bool   `json:"translated"`
 }
 
 type CategoryTranslation struct {

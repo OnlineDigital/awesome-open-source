@@ -14,6 +14,7 @@ import (
 	"awesomeopensource.dev/app/github"
 	"awesomeopensource.dev/app/store"
 	"github.com/gofiber/fiber/v3"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 const pageSize = 30
@@ -171,6 +172,10 @@ func Update(app *application.Application) fiber.Handler {
 			catID = &req.CategoryID
 		}
 		if err := app.Store.UpdateProject(c.Context(), pid, store.ProjectEdit{CategoryID: catID, YouTubeID: yt, Status: req.Status, Featured: req.Featured, Homepage: strings.TrimSpace(req.Homepage)}); err != nil {
+			var pg *pgconn.PgError
+			if errors.As(err, &pg) && pg.Code == "23503" {
+				return back(app, c, pid, map[string]string{"categoryId": "That category no longer exists."}, "")
+			}
 			return err
 		}
 		reindex(app, pid)

@@ -2,7 +2,9 @@ package store_test
 
 import (
 	"context"
+	"fmt"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -19,14 +21,26 @@ func TestStoreLifecycle(t *testing.T) {
 		t.Skip("TEST_DATABASE_URL not set")
 	}
 	ctx := context.Background()
-	pool, err := db.Open(ctx, url)
+	// Work in a throwaway schema so a real database can safely be used as TEST_DATABASE_URL.
+	schema := fmt.Sprintf("aos_test_%d", time.Now().UnixNano())
+	admin, err := db.Open(ctx, url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer admin.Close()
+	if _, err := admin.Exec(ctx, `CREATE SCHEMA `+schema); err != nil {
+		t.Fatal(err)
+	}
+	defer admin.Exec(ctx, `DROP SCHEMA `+schema+` CASCADE`)
+	sep := "?"
+	if strings.Contains(url, "?") {
+		sep = "&"
+	}
+	pool, err := db.Open(ctx, url+sep+"search_path="+schema+"%2Cpublic")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer pool.Close()
-	if _, err := pool.Exec(ctx, `DROP SCHEMA public CASCADE; CREATE SCHEMA public;`); err != nil {
-		t.Fatal(err)
-	}
 	if _, err := db.Migrate(ctx, pool); err != nil {
 		t.Fatal(err)
 	}
