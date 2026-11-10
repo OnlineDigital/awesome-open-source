@@ -1,0 +1,37 @@
+# Local infrastructure: PostgreSQL (with pgvector) and Typesense.
+#   docker compose up -d
+services:
+  postgres:
+    image: docker.io/pgvector/pgvector:pg17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-aos}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-aos}
+      POSTGRES_DB: ${POSTGRES_DB:-aos}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  typesense:
+    image: docker.io/typesense/typesense:29.0
+    restart: unless-stopped
+    command: ["--data-dir", "/data", "--api-key", "${TYPESENSE_API_KEY:-aos-dev-typesense-key}", "--enable-cors"]
+    ports:
+      - "${TYPESENSE_PORT:-8108}:8108"
+    volumes:
+      - typesense-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8108 && printf \"GET /health HTTP/1.0\\r\\n\\r\\n\" >&3 && grep -q ok <&3'"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres-data:
+  typesense-data:
