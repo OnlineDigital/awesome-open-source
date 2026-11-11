@@ -183,7 +183,7 @@ func (s *Store) TopicsForSlugs(ctx context.Context, slugs []string, locale strin
 		return nil, err
 	}
 	defer rows.Close()
-	var out []Topic
+	out := []Topic{}
 	for rows.Next() {
 		t, err := scanTopic(rows)
 		if err != nil {
@@ -203,7 +203,7 @@ func (s *Store) Features(ctx context.Context, topicID int64, locale string) ([]F
 	}
 	defer rows.Close()
 	loc := s.loc(locale)
-	var out []Feature
+	out := []Feature{}
 	idx := map[int64]int{}
 	for rows.Next() {
 		var id int64

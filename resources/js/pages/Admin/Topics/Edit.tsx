@@ -50,7 +50,7 @@ export default function TopicEdit(props: { topic: Topic; translations: Record<st
   const [locale, setLocale] = createSignal(props.defaultLocale)
 
   const [features, setFeatures] = createStore<{ id: number; translations: Record<string, { name: string; description: string }> }[]>(
-    props.features.map(f => ({ id: f.id, translations: Object.fromEntries(props.adminLocales.map(l => [l, { name: f.translations[l]?.name ?? '', description: f.translations[l]?.description ?? '' }])) })),
+    (props.features ?? []).map(f => ({ id: f.id, translations: Object.fromEntries(props.adminLocales.map(l => [l, { name: f.translations[l]?.name ?? '', description: f.translations[l]?.description ?? '' }])) })),
   )
   const addFeature = () => setFeatures(produce(list => { list.push({ id: 0, translations: Object.fromEntries(props.adminLocales.map(l => [l, { name: '', description: '' }])) }) }))
   const move = (i: number, d: number) => setFeatures(produce(list => { const j = i + d; if (j < 0 || j >= list.length) return; [list[i], list[j]] = [list[j], list[i]] }))
@@ -121,7 +121,7 @@ export default function TopicEdit(props: { topic: Topic; translations: Record<st
       <section class="panel">
         <h2>Values per project</h2>
         <p class="muted small">Choose Yes / No / Partial, or add a note per language (for example "paid first-party plugin"). "Text only" shows just the note. Changes save immediately.</p>
-        <Show when={props.features.length > 0 && props.projects.length > 0} fallback={<p class="empty">Save at least one feature and add projects to rate them.</p>}>
+        <Show when={(props.features?.length ?? 0) > 0 && (props.projects?.length ?? 0) > 0} fallback={<p class="empty">Save at least one feature and add projects to rate them.</p>}>
           <div class="mx-scroll">
             <table class="table mx">
               <thead><tr><th>Project</th><For each={props.features}>{f => <th>{f.name}</th>}</For></tr></thead>
@@ -129,7 +129,7 @@ export default function TopicEdit(props: { topic: Topic; translations: Record<st
                 <For each={props.projects}>{r => (
                   <tr>
                     <th scope="row"><Link href={`/admin/projects/${r.id}`}>{r.fullName}</Link> <Show when={r.status !== 'published'}><span class="pill pill-draft">draft</span></Show></th>
-                    <For each={props.features}>{f => <Cell topicId={t().id} row={r} feature={f} value={props.values[String(r.id)]?.[String(f.id)]} locales={props.adminLocales} defaultLocale={props.defaultLocale} />}</For>
+                    <For each={props.features}>{f => <Cell topicId={t().id} row={r} feature={f} value={props.values?.[String(r.id)]?.[String(f.id)]} locales={props.adminLocales} defaultLocale={props.defaultLocale} />}</For>
                   </tr>
                 )}</For>
               </tbody>
