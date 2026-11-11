@@ -147,7 +147,7 @@ func (s *Store) ListProjects(ctx context.Context, f ProjectFilter) ([]Project, i
 		return nil, 0, err
 	}
 	defer rows.Close()
-	var out []Project
+	out := []Project{}
 	for rows.Next() {
 		p, err := scanProject(rows)
 		if err != nil {
@@ -426,7 +426,7 @@ func (s *Store) Related(ctx context.Context, p *Project, locale string, n int) (
 		}
 	}
 	defer rows.Close()
-	var out []Project
+	out := []Project{}
 	for rows.Next() {
 		r, err := scanProject(rows)
 		if err != nil {

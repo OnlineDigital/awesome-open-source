@@ -164,8 +164,8 @@ func buildTools(app *application.Application) []Tool {
 				if a.CategoryID > 0 {
 					cat = &a.CategoryID
 				}
-				var added, existing []string
-				var invalid []string
+				added, existing := []string{}, []string{}
+				invalid := []string{}
 				var ids []int64
 				for _, r := range a.Repositories {
 					owner, name, ok := github.ParseRepo(r)
