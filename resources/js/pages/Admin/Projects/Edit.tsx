@@ -1,4 +1,5 @@
-import { Link, router, useForm } from 'inertia-adapter-solid'
+import { router, useForm } from 'inertia-adapter-solid'
+import { Link } from '../../../components/link'
 import { createSignal, For, Show } from 'solid-js'
 import { Field, Select } from '../../../components/admin_ui'
 import { ScoreBreakdown } from '../../../components/score_breakdown'
@@ -14,6 +15,7 @@ export default function ProjectEdit(props: { project: Project; translations: Rec
   for (const l of props.adminLocales) initialTexts[l] = { tagline: props.translations[l]?.tagline ?? '', description: props.translations[l]?.description ?? '' }
   const texts = useForm({ translations: initialTexts })
   const [locale, setLocale] = createSignal(props.defaultLocale)
+  const extra = useForm({ topics: (props.project.extraTopics ?? []).join(', ') })
   const shot = useForm({ file: null as File | null, alt: '' })
   const base = () => `/admin/projects/${p().id}`
   const machine = (l: string) => props.translations[l]?.source === 'machine'
@@ -40,6 +42,13 @@ export default function ProjectEdit(props: { project: Project; translations: Rec
         </div>
         <label class="check"><input type="checkbox" checked={settings.data.featured} onChange={e => settings.setData('featured', e.currentTarget.checked)} /> Featured</label>
         <div class="actions"><button type="submit" disabled={settings.processing}>Save</button></div>
+      </form>
+
+      <form class="panel" onSubmit={e => { e.preventDefault(); extra.put(`${base()}/topics`, { preserveScroll: true }) }}>
+        <h2>Extra topics</h2>
+        <p class="muted small">GitHub topics: {p().topics.length ? p().topics.join(', ') : 'none'}. Extra topics are curated by you and are kept when the project is re-synced. They place the project on topic pages.</p>
+        <Field label="Extra topics" for="extra-topics" hint="Comma separated slugs, e.g. laravel-admin-panel"><input id="extra-topics" value={extra.data.topics} onInput={e => extra.setData('topics', e.currentTarget.value)} /></Field>
+        <button type="submit" disabled={extra.processing}>Save topics</button>
       </form>
 
       <form class="panel" onSubmit={e => { e.preventDefault(); texts.put(`${base()}/translations`) }}>

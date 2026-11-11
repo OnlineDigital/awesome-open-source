@@ -1,4 +1,5 @@
-import { Link, router } from 'inertia-adapter-solid'
+import { router } from 'inertia-adapter-solid'
+import { Link } from '../../components/link'
 import { For } from 'solid-js'
 import { StatusPill } from '../../components/admin_ui'
 import type { Project, Shared } from '../../types'

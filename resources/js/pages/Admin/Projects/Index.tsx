@@ -1,4 +1,5 @@
-import { Link, router, useForm } from 'inertia-adapter-solid'
+import { router, useForm } from 'inertia-adapter-solid'
+import { Link } from '../../../components/link'
 import { createSignal, For, Show } from 'solid-js'
 import { Field, Select, StatusPill } from '../../../components/admin_ui'
 import type { Project } from '../../../types'

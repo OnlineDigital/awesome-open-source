@@ -1,8 +1,9 @@
-import { Link, router, usePage } from 'inertia-adapter-solid'
+import { router, usePage } from 'inertia-adapter-solid'
+import { Link } from '../components/link'
 import { createEffect, For, Show, type ParentProps } from 'solid-js'
 import type { Shared } from '../types'
 
-const nav = [['/admin', 'Dashboard'], ['/admin/projects', 'Projects'], ['/admin/categories', 'Categories']] as const
+const nav = [['/admin', 'Dashboard'], ['/admin/projects', 'Projects'], ['/admin/categories', 'Categories'], ['/admin/topics', 'Topics'], ['/admin/settings', 'Settings']] as const
 
 export default function AdminLayout(props: ParentProps) {
   const page = usePage<any>()
