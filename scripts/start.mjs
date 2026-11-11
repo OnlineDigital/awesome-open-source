@@ -4,7 +4,7 @@ import path from 'node:path'
 import { root, terminate } from './process.mjs'
 
 const test = process.argv.includes('--test')
-const binary = path.join(root, 'build', `inertia-go-solid-template${process.platform === 'win32' ? '.exe' : ''}`)
+const binary = path.join(root, 'build', `awesomeopensource${process.platform === 'win32' ? '.exe' : ''}`)
 try { await access(binary) }
 catch { throw new Error('Build the executable first: go run . artisan build') }
 const child = spawn(binary, [], {
