@@ -1,5 +1,6 @@
 import { createSignal } from 'solid-js'
 import { useI18n } from '../lib/i18n'
+import { IconPlay } from './icons'
 
 // Click-to-load facade: no YouTube JavaScript or cookies until the visitor presses play.
 export function YouTube(props: { id: string; thumb: string; embed: string; title: string }) {
@@ -12,7 +13,7 @@ export function YouTube(props: { id: string; thumb: string; embed: string; title
       ) : (
         <button type="button" class="video-play" onClick={() => setPlaying(true)} aria-label={`${t('project.play')}: ${props.title}`}>
           <img src={props.thumb} alt="" loading="lazy" width="480" height="360" />
-          <span class="video-icon" aria-hidden="true">▶</span>
+          <span class="video-icon" aria-hidden="true"><IconPlay width={28} height={28} /></span>
         </button>
       )}
     </div>

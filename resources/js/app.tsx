@@ -1,6 +1,7 @@
 import { render } from 'solid-js/web'
 import { createInertiaApp } from 'inertia-adapter-solid'
 import '../css/app.css'
+import '../css/public.css'
 import AdminLayout from './layouts/admin_layout'
 import PublicLayout from './layouts/public_layout'
 
