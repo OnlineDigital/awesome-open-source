@@ -1,6 +1,7 @@
 import { router, usePage } from 'inertia-adapter-solid'
 import { Link } from '../components/link'
-import { createEffect, For, Show, type ParentProps } from 'solid-js'
+import { createEffect, ErrorBoundary, For, Show, type ParentProps } from 'solid-js'
+import { AsyncErrorBanner, ErrorPanel } from '../components/error_panel'
 import type { Shared } from '../types'
 
 const nav = [['/admin', 'Dashboard'], ['/admin/projects', 'Projects'], ['/admin/categories', 'Categories'], ['/admin/topics', 'Topics'], ['/admin/settings', 'Settings']] as const
@@ -12,7 +13,7 @@ export default function AdminLayout(props: ParentProps) {
   const errors = () => Object.entries(shared().errors ?? {})
   return (
     <div class="admin">
-      <Show when={shared().auth} fallback={<main class="admin-main admin-narrow">{props.children}</main>}>
+      <Show when={shared().auth} fallback={<main class="admin-main admin-narrow"><ErrorBoundary fallback={(err, reset) => <ErrorPanel error={err} reset={reset} />}>{props.children}</ErrorBoundary></main>}>
         <aside class="admin-side">
           <Link href="/admin" class="brand"><span class="brand-mark" aria-hidden="true">◆</span> Admin</Link>
           <nav aria-label="Admin">
@@ -27,7 +28,8 @@ export default function AdminLayout(props: ParentProps) {
         <main class="admin-main">
           <Show when={shared().flash?.success}><div class="notice notice-ok" role="status">{shared().flash?.success}</div></Show>
           <Show when={errors().length > 0}><div class="notice notice-err" role="alert"><For each={errors()}>{([, msg]) => <p>{msg}</p>}</For></div></Show>
-          {props.children}
+          <AsyncErrorBanner />
+          <ErrorBoundary fallback={(err, reset) => <ErrorPanel error={err} reset={reset} />}>{props.children}</ErrorBoundary>
         </main>
       </Show>
     </div>

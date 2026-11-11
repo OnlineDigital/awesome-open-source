@@ -204,3 +204,8 @@ details summary { cursor: pointer; font-weight: 600; }
 .copy { display: flex; gap: .5rem; align-items: center; flex: 1; }
 .copy input { flex: 1; font-family: ui-monospace, monospace; font-size: .85rem; }
 .snippet { background: var(--surface-2); padding: .6rem .8rem; border-radius: 8px; overflow-x: auto; font-size: .85rem; }
+
+/* admin error boundary */
+.error-panel h2 { margin-top: 0; font-size: 1.1rem; }
+.error-panel .snippet { max-height: 320px; overflow: auto; white-space: pre-wrap; word-break: break-word; color: var(--text); }
+.error-banner { position: sticky; top: 0; z-index: 20; display: grid; gap: .5rem; margin-bottom: 1rem; }
