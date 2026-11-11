@@ -35,6 +35,7 @@ type IndexInput struct {
 	T                              T
 	SiteName, SiteURL, Description string
 	Categories                     []Cat
+	Topics                         []Cat
 	SitemapURL, HomeURL            string
 }
 
@@ -52,6 +53,12 @@ func BuildIndex(in IndexInput) string {
 	fmt.Fprintf(&b, "## %s\n\n", in.T("nav.categories"))
 	for _, c := range in.Categories {
 		fmt.Fprintf(&b, "- %s: %s (%s)\n", link(c.Name, "llms/category/"+c.Slug+".txt"), oneLine(c.Description), in.T("common.projects", "n", c.Count))
+	}
+	if len(in.Topics) > 0 {
+		fmt.Fprintf(&b, "\n## %s\n\n", in.T("home.compare"))
+		for _, c := range in.Topics {
+			fmt.Fprintf(&b, "- %s: %s (%s)\n", link(c.Name, "llms/topic/"+c.Slug+".md"), oneLine(c.Description), in.T("common.projects", "n", c.Count))
+		}
 	}
 	fmt.Fprintf(&b, "\n## Optional\n\n- %s\n- %s\n", link("Sitemap", in.SitemapURL), link(in.SiteName+" (HTML)", in.HomeURL))
 	return b.String()
@@ -216,4 +223,69 @@ func joinNonEmpty(parts []string, sep string) string {
 		}
 	}
 	return strings.Join(out, sep)
+}
+
+type TopicFeature struct{ Name, Description string }
+
+// TopicCell is the rendered value of one feature for one project ("Yes", "Partial (note)", or just the note).
+type TopicInput struct {
+	T                            T
+	Name, Summary, Body, PageURL string
+	Features                     []TopicFeature
+	Projects                     []Proj
+	Cells                        map[string][]string // project slug -> one rendered value per feature
+}
+
+func cellText(s string) string { return strings.ReplaceAll(oneLine(s), "|", "\\|") }
+
+// BuildTopic renders a topic as markdown with the feature comparison table.
+func BuildTopic(in TopicInput) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "# %s\n\n", in.Name)
+	if d := oneLine(in.Summary); d != "" {
+		fmt.Fprintf(&b, "> %s\n\n", d)
+	}
+	fmt.Fprintf(&b, "%s: %s · %s\n\n", in.T("llms.navigation"), link(in.T("llms.index"), "../../llms.txt"), link("HTML", in.PageURL))
+	if body := strings.TrimSpace(in.Body); body != "" {
+		b.WriteString(body + "\n\n")
+	}
+	if len(in.Features) > 0 && len(in.Projects) > 0 {
+		fmt.Fprintf(&b, "## %s\n\n| %s |", in.T("topic.table"), in.T("topic.project"))
+		for _, f := range in.Features {
+			fmt.Fprintf(&b, " %s |", cellText(f.Name))
+		}
+		b.WriteString("\n|---|")
+		for range in.Features {
+			b.WriteString("---|")
+		}
+		b.WriteString("\n")
+		for _, p := range in.Projects {
+			fmt.Fprintf(&b, "| %s |", link(p.FullName, "../"+p.Slug+".md"))
+			for _, v := range in.Cells[p.Slug] {
+				fmt.Fprintf(&b, " %s |", cellText(v))
+			}
+			b.WriteString("\n")
+		}
+		b.WriteString("\n")
+	}
+	if len(in.Features) > 0 {
+		fmt.Fprintf(&b, "## %s\n\n", in.T("topic.features"))
+		for _, f := range in.Features {
+			if d := oneLine(f.Description); d != "" {
+				fmt.Fprintf(&b, "- **%s**: %s\n", oneLine(f.Name), d)
+			} else {
+				fmt.Fprintf(&b, "- **%s**\n", oneLine(f.Name))
+			}
+		}
+		b.WriteString("\n")
+	}
+	fmt.Fprintf(&b, "## %s\n\n", in.T("common.projects", "n", len(in.Projects)))
+	for _, p := range in.Projects {
+		line := "- " + link(p.FullName, "../"+p.Slug+".md")
+		if t := scoreText(in.T, p); t != "" {
+			line += " · " + t
+		}
+		b.WriteString(line + "\n")
+	}
+	return b.String()
 }

@@ -87,6 +87,19 @@ func General(app *application.Application) fiber.Handler {
 				urls = append(urls, entries(app, "/category/"+cat.Slug, time.Now(), locs[cat.ID], false)...)
 			}
 		}
+		topics, err := app.Store.ListTopics(c.Context(), app.Cfg.DefaultLocale, true)
+		if err != nil {
+			return err
+		}
+		tlocs, err := app.Store.TopicLocales(c.Context())
+		if err != nil {
+			return err
+		}
+		for _, tp := range topics {
+			if tp.ProjectCount > 0 {
+				urls = append(urls, entries(app, "/topic/"+tp.Slug, time.Now(), tlocs[tp.ID], false)...)
+			}
+		}
 		return xml(c, seo.URLSet(urls))
 	}
 }

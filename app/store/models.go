@@ -19,6 +19,7 @@ type Project struct {
 	License        string          `json:"license"`
 	Language       string          `json:"language"`
 	Topics         []string        `json:"topics"`
+	ExtraTopics    []string        `json:"extraTopics"`
 	AvatarURL      string          `json:"avatarUrl"`
 	Stars          int             `json:"stars"`
 	Forks          int             `json:"forks"`
@@ -94,6 +95,7 @@ type ProjectFilter struct {
 	Status     string // "", draft, published
 	MinScore   float64
 	Featured   bool
+	Topic      string // GitHub topic or curated extra topic
 	Sort       string // score | stars | new | name
 	Limit      int
 	Offset     int

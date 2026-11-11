@@ -95,6 +95,51 @@ func TestStoreLifecycle(t *testing.T) {
 		t.Fatalf("sync overwrote edit: %q", en.Tagline)
 	}
 
+	// Topics: curated membership survives a GitHub resync; feature values and MCP tokens work.
+	tid, err := s.SaveTopic(ctx, store.Topic{Slug: "Admin Panel", Published: true}, []store.TopicTranslation{{Locale: "en", Name: "Admin panels", Summary: "s"}, {Locale: "ro", Name: "Panouri"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.AddExtraTopic(ctx, id, "admin-panel"); err != nil {
+		t.Fatal(err)
+	}
+	_ = s.ApplyGitHub(ctx, id, repo, scoring.Compute(repo.Signals))
+	if tl, total, _ := s.ListProjects(ctx, store.ProjectFilter{Topic: "admin-panel"}); total != 1 || len(tl) != 1 {
+		t.Fatalf("curated topic lost after resync: %d", total)
+	}
+	fs, err := s.SaveFeatures(ctx, tid, []store.Feature{{Translations: map[string]store.FeatureText{"en": {Name: "i18n"}, "ro": {Name: "Limbi"}}}})
+	if err != nil || len(fs) != 1 || fs[0].ID == 0 {
+		t.Fatalf("features: %v %v", fs, err)
+	}
+	if err := s.SetFeatureValue(ctx, tid, id, fs[0].ID, "partial", map[string]string{"en": "paid plugin", "ro": "plugin plătit"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetFeatureValue(ctx, tid, id, fs[0].ID+999, "yes", nil); err == nil {
+		t.Fatal("a feature of another topic must be rejected")
+	}
+	vals, _ := s.FeatureValues(ctx, tid)
+	if v := vals[id][fs[0].ID]; v.State != "partial" || v.Notes["ro"] != "plugin plătit" {
+		t.Fatalf("value: %+v", v)
+	}
+	if rf, _ := s.Features(ctx, tid, "ro"); rf[0].Name != "Limbi" {
+		t.Fatalf("feature name: %+v", rf)
+	}
+	tok, err := s.CreateMCPToken(ctx, "t", "secret-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ok, _ := s.MCPTokenValid(ctx, "secret-1"); !ok {
+		t.Fatal("new token must be valid")
+	}
+	_ = s.RotateMCPToken(ctx, tok.ID, "secret-2")
+	if ok, _ := s.MCPTokenValid(ctx, "secret-1"); ok {
+		t.Fatal("rotated token must stop working")
+	}
+	_ = s.RevokeMCPToken(ctx, tok.ID)
+	if ok, _ := s.MCPTokenValid(ctx, "secret-2"); ok {
+		t.Fatal("revoked token must stop working")
+	}
+
 	list, total, err := s.ListProjects(ctx, store.ProjectFilter{Locale: "ro", Status: "published", CategoryID: catID, MinScore: 1, Query: "acme"})
 	if err != nil || total != 1 || len(list) != 1 {
 		t.Fatalf("list: %v total=%d", err, total)

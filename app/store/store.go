@@ -36,7 +36,7 @@ func Slugify(s string) string {
 
 const projectSelect = `
 SELECT p.id, p.slug, p.github_owner, p.github_repo, p.category_id, COALESCE(c.slug,''), COALESCE(ct.name, cd.name, c.slug, ''),
-  p.homepage, p.license, p.language, p.topics, p.avatar_url, p.stars, p.forks, p.open_issues, p.archived, p.default_branch,
+  p.homepage, p.license, p.language, p.topics, p.extra_topics, p.avatar_url, p.stars, p.forks, p.open_issues, p.archived, p.default_branch,
   p.pushed_at, p.last_commit_at, p.last_release_at, p.last_release_tag,
   p.activity_score::float8, p.activity_tier::int, p.score_breakdown, p.youtube_id, p.status, p.featured, p.synced_at, p.sync_error, p.created_at, p.updated_at,
   COALESCE(NULLIF(t.tagline,''), d.tagline, ''), COALESCE(NULLIF(t.description,''), d.description, ''), COALESCE(t.source = 'machine' AND t.tagline <> '', false),
@@ -52,7 +52,7 @@ func scanProject(row pgx.Row) (*Project, error) {
 	var p Project
 	var breakdown []byte
 	err := row.Scan(&p.ID, &p.Slug, &p.Owner, &p.Repo, &p.CategoryID, &p.CategorySlug, &p.CategoryName,
-		&p.Homepage, &p.License, &p.Language, &p.Topics, &p.AvatarURL, &p.Stars, &p.Forks, &p.OpenIssues, &p.Archived, &p.DefaultBranch,
+		&p.Homepage, &p.License, &p.Language, &p.Topics, &p.ExtraTopics, &p.AvatarURL, &p.Stars, &p.Forks, &p.OpenIssues, &p.Archived, &p.DefaultBranch,
 		&p.PushedAt, &p.LastCommitAt, &p.LastReleaseAt, &p.LastReleaseTag,
 		&p.Score, &p.Tier, &breakdown, &p.YouTubeID, &p.Status, &p.Featured, &p.SyncedAt, &p.SyncError, &p.CreatedAt, &p.UpdatedAt,
 		&p.Tagline, &p.Description, &p.Machine, &p.Translated)
@@ -63,6 +63,9 @@ func scanProject(row pgx.Row) (*Project, error) {
 	p.Breakdown = breakdown
 	if p.Topics == nil {
 		p.Topics = []string{}
+	}
+	if p.ExtraTopics == nil {
+		p.ExtraTopics = []string{}
 	}
 	return &p, nil
 }
@@ -114,6 +117,9 @@ func (s *Store) ListProjects(ctx context.Context, f ProjectFilter) ([]Project, i
 	}
 	if f.Featured {
 		where = append(where, "p.featured")
+	}
+	if f.Topic != "" {
+		add("? = ANY(p.topics || p.extra_topics)", f.Topic)
 	}
 	if q := strings.TrimSpace(f.Query); q != "" {
 		add("(p.slug ILIKE ? OR p.github_owner ILIKE ?)", "%"+escapeLike(q)+"%")

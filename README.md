@@ -37,5 +37,12 @@ With `GITHUB_TOKEN` GraphQL inspects all branches and exact commit counts; witho
 - `/llms.txt` → `/llms/category/{slug}.txt` → `/llms/{project-slug}.md`, all relative links, also under `/{locale}/`.
 - WebMCP tools (`search_projects`, `list_categories`, `get_project`) registered via `navigator.modelContext`; backed by `/api/search`, `/api/categories`, `/api/projects/{slug}`.
 
+## Topic pages (feature comparison)
+Admin > Topics: a topic page (slug = a GitHub topic such as `laravel-admin-panel`) has translated name, summary and SEO text, a list of features (table rows) and, for every project that carries the topic, a value per feature: Yes / No / Partial / text-only, plus an optional note per language (e.g. "paid first-party plugin"). Projects can also be added by hand (Project > Extra topics, or the topic editor); these curated topics are stored in `projects.extra_topics` and survive GitHub re-syncs.
+Public: `/topic/{slug}` (hreflang, JSON-LD, no-JS fallback), listed on the homepage, in `sitemap-general.xml` and `/llms.txt` (`/llms/topic/{slug}.md` contains the comparison as a markdown table). JSON: `/api/topics`, `/api/topics/{slug}`.
+
+## MCP server for AI agents
+Admin > Settings > MCP access generates links such as `https://host/mcp/<secret>/sse` (HTTP+SSE) and `https://host/mcp/<secret>` (streamable HTTP). The secret in the URL is the only credential, so no env configuration is needed. Links can be named, renamed, rotated (old URL stops working at once), revoked and deleted; the full URL stays visible to admins. Tools cover projects, translations, screenshots, sync, search reindex, categories, topics, features, comparison values and curated membership (`tools/list` for the full list). Example: `claude mcp add --transport sse aos-admin <sse url>`.
+
 ## Tests
 `./artisan test` (Go + typecheck). Store integration test needs `TEST_DATABASE_URL` (uses a throwaway schema).

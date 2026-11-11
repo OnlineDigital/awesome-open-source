@@ -16,6 +16,7 @@
  "search.no_results": "Nu am găsit proiecte.",
  "search.found": "{n} proiecte",
  "search.min_score": "Scor minim",
+ "search.any_score": "Oricare",
  "search.all_categories": "Toate categoriile",
  "search.unavailable": "Căutarea este temporar indisponibilă.",
  "category.title": "{name} open source",
@@ -73,5 +74,17 @@
  "llms.index": "Index",
  "llms.facts": "Informații",
  "llms.description": "Descriere",
- "error.server": "Ceva nu a mers bine"
+ "error.server": "Ceva nu a mers bine",
+ "home.compare": "Compară proiecte",
+ "topic.table": "Comparație de funcționalități",
+ "topic.features": "Funcționalități",
+ "topic.project": "Proiect",
+ "topic.feature": "Funcționalitate",
+ "topic.yes": "Da",
+ "topic.no": "Nu",
+ "topic.partial": "Parțial",
+ "topic.unrated": "Neevaluat",
+ "topic.compared_in": "Comparat în",
+ "topic.more": "Alte comparații",
+ "topic.title": "{name}: comparație de funcționalități"
 }

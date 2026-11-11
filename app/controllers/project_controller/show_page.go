@@ -92,8 +92,12 @@ func Show(app *application.Application) fiber.Handler {
 			{Links: []seo.Link{{Text: t("project.github"), URL: "https://github.com/" + p.FullName}, {Text: t("project.read_md"), URL: app.Path(loc, "/llms/"+p.Slug+".md")}}},
 		})
 
+		compared, err := app.Store.TopicsForSlugs(ctx, append(append([]string{}, p.Topics...), p.ExtraTopics...), loc)
+		if err != nil {
+			return err
+		}
 		return app.Page(c, "Project", path, inertia.Props{
-			"project": p, "activity": act, "related": app.Cards(related, loc), "translations": map[string]any{"machine": p.Machine},
+			"project": p, "activity": act, "related": app.Cards(related, loc), "compared": app.TopicCards(compared, loc), "translations": map[string]any{"machine": p.Machine},
 			"video":        map[string]string{"id": p.YouTubeID, "thumb": application.YouTubeThumb(p.YouTubeID), "embed": application.YouTubeEmbed(p.YouTubeID)},
 			"markdownPath": app.Path(loc, "/llms/"+p.Slug+".md"),
 		}, meta)

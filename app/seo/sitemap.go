@@ -78,7 +78,7 @@ func Index(refs []SitemapRef) []byte {
 func Robots(baseURL string) string {
 	bots := []string{"GPTBot", "OAI-SearchBot", "ChatGPT-User", "ClaudeBot", "Claude-User", "Claude-SearchBot", "PerplexityBot", "Google-Extended", "Applebot-Extended", "CCBot"}
 	var b strings.Builder
-	b.WriteString("User-agent: *\nAllow: /\nDisallow: /admin\nDisallow: /api/\n\n")
+	b.WriteString("User-agent: *\nAllow: /\nDisallow: /admin\nDisallow: /api/\nDisallow: /mcp/\n\n")
 	for _, bot := range bots {
 		b.WriteString("User-agent: " + bot + "\nAllow: /\nDisallow: /admin\n\n")
 	}

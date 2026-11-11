@@ -126,8 +126,9 @@ func (m *Meta) HeadHTML() template.HTML {
 
 type Link struct{ Text, URL, Note string }
 type Section struct {
-	Heading string
-	Links   []Link
+	Heading    string
+	Paragraphs []string
+	Links      []Link
 }
 
 // Fallback renders plain semantic HTML for the <noscript> block (crawlers and agents without JavaScript).
@@ -138,13 +139,18 @@ func Fallback(h1, intro string, sections []Section) template.HTML {
 		b.WriteString("<p>" + html.EscapeString(intro) + "</p>")
 	}
 	for _, s := range sections {
-		if len(s.Links) == 0 {
+		if len(s.Links) == 0 && len(s.Paragraphs) == 0 {
 			continue
 		}
 		if s.Heading != "" {
 			b.WriteString("<h2>" + html.EscapeString(s.Heading) + "</h2>")
 		}
-		b.WriteString("<ul>")
+		for _, para := range s.Paragraphs {
+			b.WriteString("<p>" + html.EscapeString(para) + "</p>")
+		}
+		if len(s.Links) > 0 {
+			b.WriteString("<ul>")
+		}
 		for _, l := range s.Links {
 			b.WriteString(`<li><a href="` + html.EscapeString(l.URL) + `">` + html.EscapeString(l.Text) + "</a>")
 			if l.Note != "" {
@@ -152,7 +158,9 @@ func Fallback(h1, intro string, sections []Section) template.HTML {
 			}
 			b.WriteString("</li>")
 		}
-		b.WriteString("</ul>")
+		if len(s.Links) > 0 {
+			b.WriteString("</ul>")
+		}
 	}
 	b.WriteString("</main>")
 	return template.HTML(b.String())

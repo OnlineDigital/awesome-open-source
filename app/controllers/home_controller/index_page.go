@@ -24,6 +24,16 @@ func Index(app *application.Application) fiber.Handler {
 		if err != nil {
 			return err
 		}
+		topics, err := app.Store.ListTopics(ctx, loc, true)
+		if err != nil {
+			return err
+		}
+		var shownTopics []store.Topic
+		for _, tp := range topics {
+			if tp.ProjectCount > 0 {
+				shownTopics = append(shownTopics, tp)
+			}
+		}
 		base := app.Cfg.BaseURL
 		meta := app.NewMeta(loc, "/", t("seo.home_title"), t("seo.home_description"))
 		meta.Markdown = base + app.Path(loc, "/llms.txt")
@@ -38,12 +48,16 @@ func Index(app *application.Application) fiber.Handler {
 		for _, p := range app.Cards(top, loc) {
 			projLinks = append(projLinks, seo.Link{Text: p.FullName, URL: p.Path, Note: p.Tagline})
 		}
+		var topicLinks []seo.Link
+		for _, tc := range app.TopicCards(shownTopics, loc) {
+			topicLinks = append(topicLinks, seo.Link{Text: tc.Name, URL: tc.Path, Note: tc.Summary})
+		}
 		meta.Fallback = seo.Fallback(t("home.title"), t("home.subtitle"), []seo.Section{
-			{Heading: t("home.browse"), Links: catLinks}, {Heading: t("home.top_active"), Links: projLinks},
+			{Heading: t("home.browse"), Links: catLinks}, {Heading: t("home.compare"), Links: topicLinks}, {Heading: t("home.top_active"), Links: projLinks},
 			{Links: []seo.Link{{Text: t("footer.ai"), URL: app.Path(loc, "/llms.txt")}, {Text: t("footer.sitemap"), URL: "/sitemap.xml"}}},
 		})
 		return app.Page(c, "Home", "/", inertia.Props{
-			"categories": app.CategoryCards(cats, loc), "top": app.Cards(top, loc), "latest": app.Cards(latest, loc),
+			"categories": app.CategoryCards(cats, loc), "top": app.Cards(top, loc), "latest": app.Cards(latest, loc), "topics": app.TopicCards(shownTopics, loc),
 		}, meta)
 	}
 }

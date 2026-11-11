@@ -29,3 +29,16 @@ func TestRelativeLinkTree(t *testing.T) {
 		}
 	}
 }
+
+func TestBuildTopicTable(t *testing.T) {
+	tr := func(key string, kv ...any) string { return key }
+	out := BuildTopic(TopicInput{T: tr, Name: "Admin panels", Summary: "Compare", PageURL: "https://x/topic/a",
+		Features: []TopicFeature{{Name: "i18n"}, {Name: "Blocks | builder"}},
+		Projects: []Proj{{Slug: "a-b", FullName: "a/b"}},
+		Cells:    map[string][]string{"a-b": {"Yes", "Partial (paid plugin)"}}})
+	for _, want := range []string{"# Admin panels", "| topic.project | i18n | Blocks \\| builder |", "| [a/b](../a-b.md) | Yes | Partial (paid plugin) |"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("missing %q in:\n%s", want, out)
+		}
+	}
+}

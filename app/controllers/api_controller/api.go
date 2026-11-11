@@ -65,3 +65,43 @@ func Project(app *application.Application) fiber.Handler {
 		return c.JSON(out)
 	}
 }
+
+func Topics(app *application.Application) fiber.Handler {
+	return func(c fiber.Ctx) error {
+		public(c)
+		loc := locale(app, c)
+		ts, err := app.Store.ListTopics(c.Context(), loc, true)
+		if err != nil {
+			return err
+		}
+		return c.JSON(fiber.Map{"topics": app.TopicCards(ts, loc)})
+	}
+}
+
+// Topic returns a topic with its feature comparison table.
+func Topic(app *application.Application) fiber.Handler {
+	return func(c fiber.Ctx) error {
+		public(c)
+		ctx, loc := c.Context(), locale(app, c)
+		topic, err := app.Store.TopicBySlug(ctx, application.RouteParameter(c, "slug"), loc, true)
+		if errors.Is(err, store.ErrNotFound) {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "topic not found"})
+		} else if err != nil {
+			return err
+		}
+		ps, _, err := app.Store.ListProjects(ctx, store.ProjectFilter{Locale: loc, Status: "published", Topic: topic.Slug, Sort: "score", Limit: 200})
+		if err != nil {
+			return err
+		}
+		features, err := app.Store.Features(ctx, topic.ID, loc)
+		if err != nil {
+			return err
+		}
+		values, err := app.Store.FeatureValues(ctx, topic.ID)
+		if err != nil {
+			return err
+		}
+		tbl := app.BuildTopicTable(features, values, ps, loc)
+		return c.JSON(fiber.Map{"topic": app.TopicCards([]store.Topic{*topic}, loc)[0], "body": topic.Body, "features": tbl.Features, "cells": tbl.Cells, "projects": app.Cards(ps, loc), "markdown": app.Abs(loc, "/llms/topic/"+topic.Slug+".md")})
+	}
+}

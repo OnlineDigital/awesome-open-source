@@ -16,6 +16,7 @@
  "search.no_results": "No se encontraron proyectos.",
  "search.found": "{n} proyectos",
  "search.min_score": "Puntuación mínima",
+ "search.any_score": "Cualquiera",
  "search.all_categories": "Todas las categorías",
  "search.unavailable": "La búsqueda no está disponible temporalmente.",
  "category.title": "{name} de código abierto",
@@ -73,5 +74,17 @@
  "llms.index": "Índice",
  "llms.facts": "Datos",
  "llms.description": "Descripción",
- "error.server": "Algo salió mal"
+ "error.server": "Algo salió mal",
+ "home.compare": "Comparar proyectos",
+ "topic.table": "Comparación de funciones",
+ "topic.features": "Funciones",
+ "topic.project": "Proyecto",
+ "topic.feature": "Función",
+ "topic.yes": "Sí",
+ "topic.no": "No",
+ "topic.partial": "Parcial",
+ "topic.unrated": "Sin evaluar",
+ "topic.compared_in": "Comparado en",
+ "topic.more": "Más comparaciones",
+ "topic.title": "{name}: comparación de funciones"
 }

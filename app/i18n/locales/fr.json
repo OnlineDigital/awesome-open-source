@@ -16,6 +16,7 @@
  "search.no_results": "Aucun projet trouvé.",
  "search.found": "{n} projets",
  "search.min_score": "Score minimum",
+ "search.any_score": "Tous",
  "search.all_categories": "Toutes les catégories",
  "search.unavailable": "La recherche est temporairement indisponible.",
  "category.title": "{name} open source",
@@ -73,5 +74,17 @@
  "llms.index": "Index",
  "llms.facts": "Informations",
  "llms.description": "Description",
- "error.server": "Une erreur est survenue"
+ "error.server": "Une erreur est survenue",
+ "home.compare": "Comparer les projets",
+ "topic.table": "Comparaison des fonctionnalités",
+ "topic.features": "Fonctionnalités",
+ "topic.project": "Projet",
+ "topic.feature": "Fonctionnalité",
+ "topic.yes": "Oui",
+ "topic.no": "Non",
+ "topic.partial": "Partiel",
+ "topic.unrated": "Non évalué",
+ "topic.compared_in": "Comparé dans",
+ "topic.more": "Autres comparaisons",
+ "topic.title": "{name} : comparaison des fonctionnalités"
 }

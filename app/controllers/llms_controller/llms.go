@@ -3,6 +3,7 @@ package llms_controller
 
 import (
 	"errors"
+	"strconv"
 	"strings"
 
 	"awesomeopensource.dev/app/application"
@@ -35,6 +36,15 @@ func Index(app *application.Application) fiber.Handler {
 		for _, cat := range cats {
 			if cat.ProjectCount > 0 {
 				in.Categories = append(in.Categories, llms.Cat{Slug: cat.Slug, Name: cat.Name, Description: cat.Description, Count: cat.ProjectCount})
+			}
+		}
+		topics, err := app.Store.ListTopics(c.Context(), loc, true)
+		if err != nil {
+			return err
+		}
+		for _, tp := range topics {
+			if tp.ProjectCount > 0 {
+				in.Topics = append(in.Topics, llms.Cat{Slug: tp.Slug, Name: tp.Name, Description: tp.Summary, Count: tp.ProjectCount})
 			}
 		}
 		setHeaders(c, "text/plain; charset=utf-8")
@@ -121,5 +131,60 @@ func Project(app *application.Application) fiber.Handler {
 		}
 		setHeaders(c, "text/markdown; charset=utf-8")
 		return c.SendString(llms.BuildProject(in))
+	}
+}
+
+// Topic serves /llms/topic/{slug}.md with the feature comparison table.
+func Topic(app *application.Application) fiber.Handler {
+	return func(c fiber.Ctx) error {
+		ctx, loc := c.Context(), app.LocaleOf(c)
+		slug, ok := strings.CutSuffix(application.RouteParameter(c, "file"), ".md")
+		if !ok {
+			return fiber.ErrNotFound
+		}
+		topic, err := app.Store.TopicBySlug(ctx, slug, loc, true)
+		if errors.Is(err, store.ErrNotFound) {
+			return fiber.ErrNotFound
+		} else if err != nil {
+			return err
+		}
+		ps, _, err := app.Store.ListProjects(ctx, store.ProjectFilter{Locale: loc, Status: "published", Topic: topic.Slug, Sort: "score", Limit: 200})
+		if err != nil {
+			return err
+		}
+		features, err := app.Store.Features(ctx, topic.ID, loc)
+		if err != nil {
+			return err
+		}
+		values, err := app.Store.FeatureValues(ctx, topic.ID)
+		if err != nil {
+			return err
+		}
+		t := tFor(app, loc)
+		table := app.BuildTopicTable(features, values, ps, loc)
+		in := llms.TopicInput{T: t, Name: topic.Name, Summary: topic.Summary, Body: topic.Body, PageURL: app.Abs(loc, "/topic/"+topic.Slug), Cells: map[string][]string{}}
+		for _, f := range features {
+			in.Features = append(in.Features, llms.TopicFeature{Name: f.Name, Description: f.Description})
+		}
+		for i := range ps {
+			in.Projects = append(in.Projects, projOf(t, &ps[i]))
+			row := make([]string, 0, len(features))
+			for _, f := range table.Features {
+				cell, ok := table.Cells[ps[i].Slug][strconv.FormatInt(f.ID, 10)]
+				switch {
+				case !ok:
+					row = append(row, "–")
+				case cell.State == "text":
+					row = append(row, cell.Note)
+				case cell.Note != "":
+					row = append(row, t("topic."+cell.State)+" ("+cell.Note+")")
+				default:
+					row = append(row, t("topic."+cell.State))
+				}
+			}
+			in.Cells[ps[i].Slug] = row
+		}
+		setHeaders(c, "text/markdown; charset=utf-8")
+		return c.SendString(llms.BuildTopic(in))
 	}
 }

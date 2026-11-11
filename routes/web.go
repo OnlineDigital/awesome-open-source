@@ -7,6 +7,8 @@ import (
 	"awesomeopensource.dev/app/controllers/admin_category_controller"
 	"awesomeopensource.dev/app/controllers/admin_controller"
 	"awesomeopensource.dev/app/controllers/admin_project_controller"
+	"awesomeopensource.dev/app/controllers/admin_settings_controller"
+	"awesomeopensource.dev/app/controllers/admin_topic_controller"
 	"awesomeopensource.dev/app/controllers/api_controller"
 	"awesomeopensource.dev/app/controllers/category_controller"
 	"awesomeopensource.dev/app/controllers/health_controller"
@@ -15,6 +17,8 @@ import (
 	"awesomeopensource.dev/app/controllers/project_controller"
 	"awesomeopensource.dev/app/controllers/search_controller"
 	"awesomeopensource.dev/app/controllers/seo_controller"
+	"awesomeopensource.dev/app/controllers/topic_controller"
+	"awesomeopensource.dev/app/mcp"
 	"awesomeopensource.dev/internal/router"
 	"github.com/gofiber/fiber/v3"
 )
@@ -31,6 +35,14 @@ func Web(app *application.Application, fiberApp *fiber.App) *router.Router {
 	app.RouteList = func() any { return r.Routes() }
 
 	r.Get("/health", health_controller.Index(app)).Name("health")
+	// MCP for AI agents: the secret in the URL is managed in Admin > Settings.
+	mcpServer := mcp.New(app)
+	r.Get("/mcp/:token/sse", mcpServer.SSE()).Name("mcp.sse")
+	r.Post("/mcp/:token/messages", mcpServer.Messages()).Name("mcp.messages")
+	r.Post("/mcp/:token", mcpServer.HTTP()).Name("mcp.http")
+	r.Delete("/mcp/:token", mcpServer.HTTP()).Name("mcp.http.delete")
+	r.Get("/mcp/:token", mcpServer.HTTP()).Name("mcp.http.get")
+
 	r.Get("/robots.txt", seo_controller.Robots(app)).Name("robots")
 	r.Get("/sitemap.xml", seo_controller.Index(app)).Name("sitemap")
 	r.Get("/sitemap-general.xml", seo_controller.General(app)).Name("sitemap.general")
@@ -41,6 +53,8 @@ func Web(app *application.Application, fiberApp *fiber.App) *router.Router {
 		api.Get("/search", api_controller.Search(app)).Name("search")
 		api.Get("/categories", api_controller.Categories(app)).Name("categories")
 		api.Get("/projects/:slug", api_controller.Project(app)).Name("project")
+		api.Get("/topics", api_controller.Topics(app)).Name("topics")
+		api.Get("/topics/:slug", api_controller.Topic(app)).Name("topic")
 	})
 
 	// Public site: default locale at the root, every other locale under /{locale}.
@@ -52,10 +66,12 @@ func Web(app *application.Application, fiberApp *fiber.App) *router.Router {
 		r.Group(prefix, loc+".", []router.Middleware{app.LocaleMiddleware(loc), publicCache}, func(g *router.Router) {
 			g.Get("/", home_controller.Index(app)).Name("home")
 			g.Get("/category/:slug", category_controller.Show(app)).Name("category")
+			g.Get("/topic/:slug", topic_controller.Show(app)).Name("topic")
 			g.Get("/project/:slug", project_controller.Show(app)).Name("project")
 			g.Get("/search", search_controller.Index(app)).Name("search")
 			g.Get("/llms.txt", llms_controller.Index(app)).Name("llms")
 			g.Get("/llms/category/:file", llms_controller.Category(app)).Name("llms.category")
+			g.Get("/llms/topic/:file", llms_controller.Topic(app)).Name("llms.topic")
 			g.Get("/llms/:file", llms_controller.Project(app)).Name("llms.project")
 		})
 	}
@@ -87,6 +103,24 @@ func Web(app *application.Application, fiberApp *fiber.App) *router.Router {
 			g.Post("/categories", admin_category_controller.Store(app)).Name("categories.store")
 			g.Put("/categories/:id", admin_category_controller.Update(app)).Name("categories.update")
 			g.Delete("/categories/:id", admin_category_controller.Destroy(app)).Name("categories.destroy")
+			g.Put("/projects/:id/topics", admin_topic_controller.ProjectTopics(app)).Name("projects.topics")
+
+			g.Get("/topics", admin_topic_controller.Index(app)).Name("topics.index")
+			g.Post("/topics", admin_topic_controller.Store(app)).Name("topics.store")
+			g.Get("/topics/:id", admin_topic_controller.Edit(app)).Name("topics.edit")
+			g.Put("/topics/:id", admin_topic_controller.Update(app)).Name("topics.update")
+			g.Delete("/topics/:id", admin_topic_controller.Destroy(app)).Name("topics.destroy")
+			g.Put("/topics/:id/features", admin_topic_controller.SaveFeatures(app)).Name("topics.features")
+			g.Put("/topics/:id/values", admin_topic_controller.SetValue(app)).Name("topics.values")
+			g.Post("/topics/:id/projects", admin_topic_controller.AddProject(app)).Name("topics.projects.add")
+			g.Delete("/topics/:id/projects/:project", admin_topic_controller.RemoveProject(app)).Name("topics.projects.remove")
+			g.Post("/topics/:id/translate", admin_topic_controller.Translate(app)).Name("topics.translate")
+			g.Get("/settings", admin_settings_controller.Index(app)).Name("settings")
+			g.Post("/settings/mcp-tokens", admin_settings_controller.Create(app)).Name("settings.mcp.store")
+			g.Put("/settings/mcp-tokens/:id", admin_settings_controller.Rename(app)).Name("settings.mcp.rename")
+			g.Post("/settings/mcp-tokens/:id/rotate", admin_settings_controller.Rotate(app)).Name("settings.mcp.rotate")
+			g.Post("/settings/mcp-tokens/:id/revoke", admin_settings_controller.Revoke(app)).Name("settings.mcp.revoke")
+			g.Delete("/settings/mcp-tokens/:id", admin_settings_controller.Destroy(app)).Name("settings.mcp.destroy")
 			g.Post("/categories/:id/translate", admin_category_controller.Translate(app)).Name("categories.translate")
 		})
 	})

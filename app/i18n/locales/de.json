@@ -16,6 +16,7 @@
  "search.no_results": "Keine Projekte gefunden.",
  "search.found": "{n} Projekte",
  "search.min_score": "Mindest-Score",
+ "search.any_score": "Alle",
  "search.all_categories": "Alle Kategorien",
  "search.unavailable": "Die Suche ist vorübergehend nicht verfügbar.",
  "category.title": "Open-Source-{name}",
@@ -73,5 +74,17 @@
  "llms.index": "Index",
  "llms.facts": "Fakten",
  "llms.description": "Beschreibung",
- "error.server": "Etwas ist schiefgelaufen"
+ "error.server": "Etwas ist schiefgelaufen",
+ "home.compare": "Projekte vergleichen",
+ "topic.table": "Funktionsvergleich",
+ "topic.features": "Funktionen",
+ "topic.project": "Projekt",
+ "topic.feature": "Funktion",
+ "topic.yes": "Ja",
+ "topic.no": "Nein",
+ "topic.partial": "Teilweise",
+ "topic.unrated": "Nicht bewertet",
+ "topic.compared_in": "Verglichen in",
+ "topic.more": "Weitere Vergleiche",
+ "topic.title": "{name}: Funktionsvergleich"
 }
