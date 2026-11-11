@@ -20,3 +20,6 @@ export const BrandMark = () => (
     <g class="bm-leaves"><path class="bm-l bm-l1" d="M16 16c0-4.2-2.8-6.6-7.5-6.6 0 4.4 2.8 6.6 7.5 6.6z" fill="currentColor" /><path class="bm-l bm-l2" d="M16 13c0-3.6 2.4-5.6 6.5-5.6 0 3.8-2.4 5.6-6.5 5.6z" fill="currentColor" /></g>
   </svg>
 )
+
+/** Generic wiki mark (open book with a spark) standing in for DeepWiki; swap for the official logo asset if licensed. */
+export const IconWiki = (p: JSX.SvgSVGAttributes<SVGSVGElement>) => <svg {...base} {...p}><path d="M3.5 6.5C6 5 9 5 12 6.8c3-1.8 6-1.8 8.5-.3v11.5c-2.5-1.5-5.5-1.5-8.5.3-3-1.8-6-1.8-8.5-.3z" /><path d="M12 6.8V18.3" /><path d="M17.5 2.5v3M16 4h3" /></svg>

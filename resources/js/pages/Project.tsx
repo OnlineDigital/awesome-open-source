@@ -1,5 +1,6 @@
 import { Link } from '../components/link'
 import { For, Show } from 'solid-js'
+import { DeepWiki } from '../components/deepwiki'
 import { FieldMarks } from '../components/field_marks'
 import { Gallery } from '../components/gallery'
 import { IconDoc, IconExternal, IconStar } from '../components/icons'
@@ -50,6 +51,7 @@ export default function ProjectPage(props: { project: Project; activity: Activit
               <Show when={p().machineTranslated}><p class="muted small">{t('project.machine_translated')}</p></Show>
             </section>
           </Show>
+          <DeepWiki slug={p().slug} fullName={p().fullName} />
           <Show when={(p().screenshots?.length ?? 0) > 0}>
             <section aria-labelledby="shots-h"><h2 id="shots-h">{t('project.screenshots')}</h2><Gallery shots={p().screenshots!} fallbackAlt={`${p().repo} screenshot`} /></section>
           </Show>

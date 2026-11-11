@@ -17,6 +17,7 @@ import (
 
 	"awesomeopensource.dev/app/config"
 	"awesomeopensource.dev/app/db"
+	"awesomeopensource.dev/app/deepwiki"
 	vec "awesomeopensource.dev/app/embed"
 	"awesomeopensource.dev/app/github"
 	"awesomeopensource.dev/app/i18n"
@@ -49,6 +50,7 @@ type Application struct {
 	Translator *translate.Translator
 	Embedder   *vec.Client
 	GitHub     *github.Client
+	DeepWiki   *deepwiki.Client
 	Syncer     *syncer.Syncer
 
 	RouteURL  func(string, map[string]string, url.Values) (string, error)
@@ -86,6 +88,7 @@ func NewCore(cfg config.Config) (*Application, error) {
 		a.Embedder = vec.New(cfg.EmbeddingsURL, cfg.EmbeddingsKey, cfg.EmbeddingsModel)
 	}
 	a.GitHub = github.New(cfg.GitHubToken)
+	a.DeepWiki = deepwiki.New()
 	a.Syncer = &syncer.Syncer{Store: a.Store, GitHub: a.GitHub, Index: a.Indexer, Embed: a.Embedder, Delay: 300 * time.Millisecond}
 	return a, nil
 }

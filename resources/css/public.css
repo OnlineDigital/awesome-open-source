@@ -225,6 +225,18 @@
 .lightbox figure { margin: 0; display: grid; gap: .5rem; justify-items: center; color: var(--text); }
 .lightbox img { max-height: 82vh; border-radius: 8px; max-width: 100%; }
 .site .lightbox-close { width: 44px; justify-content: center; padding: 0; border-radius: 50%; }
+.deepwiki { display: flex; align-items: center; gap: 1rem; margin-block: 2rem; padding: 1rem 1.25rem; min-height: 5rem; border: 2px solid var(--border); border-radius: var(--radius); background: var(--panel); color: var(--text); text-decoration: none; transition: border-color .15s, background-color .15s, transform .08s; }
+.deepwiki:hover { border-color: var(--k4); background: var(--surface); }
+.deepwiki:active { transform: translateY(1px); }
+.deepwiki-logo { display: grid; place-items: center; flex: none; width: 3rem; height: 3rem; border-radius: 6px; background: var(--k4); color: var(--accent-ink); }
+.deepwiki-text { display: grid; gap: .15rem; flex: 1; min-width: 0; }
+.deepwiki-text strong { font-family: var(--display); font-size: 1rem; }
+.deepwiki-text span { color: var(--muted); font-size: .95rem; line-height: 1.35; }
+.deepwiki-missing { border-style: dashed; }
+.deepwiki-missing .deepwiki-logo { background: var(--surface-2); color: var(--muted); }
+.deepwiki-missing:hover { border-color: var(--k3); }
+.deepwiki-missing .deepwiki-text span { color: var(--k3); }
+.deepwiki-loading { border-color: transparent; background: var(--panel); opacity: .5; }
 .related { margin-top: 4rem; }
 
 /* error */

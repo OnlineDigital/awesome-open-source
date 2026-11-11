@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"awesomeopensource.dev/app/application"
+	"awesomeopensource.dev/app/deepwiki"
 	"awesomeopensource.dev/app/store"
 	"github.com/gofiber/fiber/v3"
 )
@@ -103,5 +104,25 @@ func Topic(app *application.Application) fiber.Handler {
 		}
 		tbl := app.BuildTopicTable(features, values, ps, loc)
 		return c.JSON(fiber.Map{"topic": app.TopicCards([]store.Topic{*topic}, loc)[0], "body": topic.Body, "features": tbl.Features, "cells": tbl.Cells, "projects": app.Cards(ps, loc), "markdown": app.Abs(loc, "/llms/topic/"+topic.Slug+".md")})
+	}
+}
+
+// DeepWiki handles GET /api/projects/:slug/deepwiki and says whether the repository has a DeepWiki wiki.
+func DeepWiki(app *application.Application) fiber.Handler {
+	return func(c fiber.Ctx) error {
+		c.Set("Access-Control-Allow-Origin", "*")
+		p, err := app.Store.GetProjectBySlug(c.Context(), application.RouteParameter(c, "slug"), app.Cfg.DefaultLocale, true)
+		if errors.Is(err, store.ErrNotFound) {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "project not found"})
+		} else if err != nil {
+			return err
+		}
+		st := app.DeepWiki.Check(c.Context(), p.FullName)
+		if st == deepwiki.Unknown {
+			c.Set("Cache-Control", "no-store")
+		} else {
+			c.Set("Cache-Control", "public, max-age=300")
+		}
+		return c.JSON(fiber.Map{"status": st, "url": deepwiki.URL(p.FullName)})
 	}
 }

@@ -53,6 +53,7 @@ func Web(app *application.Application, fiberApp *fiber.App) *router.Router {
 		api.Get("/search", api_controller.Search(app)).Name("search")
 		api.Get("/categories", api_controller.Categories(app)).Name("categories")
 		api.Get("/projects/:slug", api_controller.Project(app)).Name("project")
+		api.Get("/projects/:slug/deepwiki", api_controller.DeepWiki(app)).Name("project.deepwiki")
 		api.Get("/topics", api_controller.Topics(app)).Name("topics")
 		api.Get("/topics/:slug", api_controller.Topic(app)).Name("topic")
 	})
