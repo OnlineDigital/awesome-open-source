@@ -179,7 +179,8 @@ type ProjectEdit struct {
 }
 
 func (s *Store) UpdateProject(ctx context.Context, id int64, e ProjectEdit) error {
-	_, err := s.DB.Exec(ctx, `UPDATE projects SET category_id=$2, youtube_id=$3, status=$4, featured=$5, homepage=$6, updated_at=now() WHERE id=$1`,
+	_, err := s.DB.Exec(ctx, `UPDATE projects SET category_id=$2, youtube_id=$3, status=$4, featured=$5, homepage=$6, updated_at=now(),
+		published_at = CASE WHEN $4 = 'published' THEN COALESCE(published_at, now()) ELSE published_at END WHERE id=$1`,
 		id, e.CategoryID, e.YouTubeID, e.Status, e.Featured, e.Homepage)
 	return err
 }
@@ -513,4 +514,68 @@ func (s *Store) ProjectTranslatedLocales(ctx context.Context, id int64) ([]strin
 		out = append(out, l)
 	}
 	return out, rows.Err()
+}
+
+// SitemapProject is the minimum needed to describe a project in a sitemap.
+type SitemapProject struct {
+	ID          int64
+	Slug        string
+	FullName    string
+	Tagline     string
+	YouTubeID   string
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	Screenshots []string
+}
+
+func (s *Store) CountPublished(ctx context.Context) (n int, err error) {
+	err = s.DB.QueryRow(ctx, `SELECT count(*) FROM projects WHERE status='published'`).Scan(&n)
+	return
+}
+
+// SitemapPageLastMod returns the newest update inside one page of the publication-ordered list.
+func (s *Store) SitemapPageLastMod(ctx context.Context, offset, limit int) (t time.Time, err error) {
+	err = s.DB.QueryRow(ctx, `SELECT COALESCE(max(u), now()) FROM (SELECT updated_at AS u FROM projects WHERE status='published'
+		ORDER BY published_at, id OFFSET $1 LIMIT $2) x`, offset, limit).Scan(&t)
+	return
+}
+
+// SitemapProjects returns published projects ordered by publication date ascending (new ones append at the end).
+func (s *Store) SitemapProjects(ctx context.Context, offset, limit int) ([]SitemapProject, error) {
+	rows, err := s.DB.Query(ctx, `SELECT p.id, p.slug, p.github_owner || '/' || p.github_repo, COALESCE(d.tagline,''), p.youtube_id, p.created_at, p.updated_at
+		FROM projects p LEFT JOIN project_translations d ON d.project_id = p.id AND d.locale = $3
+		WHERE p.status='published' ORDER BY p.published_at, p.id OFFSET $1 LIMIT $2`, offset, limit, s.DefaultLocale)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []SitemapProject
+	idx := map[int64]int{}
+	var ids []int64
+	for rows.Next() {
+		var p SitemapProject
+		if err := rows.Scan(&p.ID, &p.Slug, &p.FullName, &p.Tagline, &p.YouTubeID, &p.CreatedAt, &p.UpdatedAt); err != nil {
+			return nil, err
+		}
+		idx[p.ID] = len(out)
+		ids = append(ids, p.ID)
+		out = append(out, p)
+	}
+	if err := rows.Err(); err != nil || len(ids) == 0 {
+		return out, err
+	}
+	shots, err := s.DB.Query(ctx, `SELECT project_id, path FROM project_screenshots WHERE project_id = ANY($1) ORDER BY position, id`, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer shots.Close()
+	for shots.Next() {
+		var id int64
+		var path string
+		if err := shots.Scan(&id, &path); err != nil {
+			return nil, err
+		}
+		out[idx[id]].Screenshots = append(out[idx[id]].Screenshots, path)
+	}
+	return out, shots.Err()
 }

@@ -33,7 +33,7 @@ With `GITHUB_TOKEN` GraphQL inspects all branches and exact commit counts; witho
 ## SEO / AI surface
 - Locale routes: default locale at `/`, others at `/ro/...`; hreflang only for translated pages, untranslated ones are `noindex` + canonical to default.
 - Head tags + schema.org JSON-LD (WebSite+SearchAction, CollectionPage, SoftwareApplication, VideoObject, BreadcrumbList) rendered server-side; `<noscript>` fallback content.
-- `/sitemap.xml` (index) → pages/categories/projects with hreflang, image and video extensions; `/robots.txt`.
+- `/sitemap.xml` is only an index (generated on request): `sitemap-general.xml` (home + categories, all locales) and `sitemap-project-001.xml`, `-002`, … (5000 projects per page, ordered by publication date ascending, so new projects append and only the last page changes). Page count comes from the number of published projects. Hreflang, image and video extensions included; `/robots.txt`.
 - `/llms.txt` → `/llms/category/{slug}.txt` → `/llms/{project-slug}.md`, all relative links, also under `/{locale}/`.
 - WebMCP tools (`search_projects`, `list_categories`, `get_project`) registered via `navigator.modelContext`; backed by `/api/search`, `/api/categories`, `/api/projects/{slug}`.
 

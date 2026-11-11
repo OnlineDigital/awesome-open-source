@@ -33,9 +33,8 @@ func Web(app *application.Application, fiberApp *fiber.App) *router.Router {
 	r.Get("/health", health_controller.Index(app)).Name("health")
 	r.Get("/robots.txt", seo_controller.Robots(app)).Name("robots")
 	r.Get("/sitemap.xml", seo_controller.Index(app)).Name("sitemap")
-	r.Get("/sitemap-pages.xml", seo_controller.Pages(app)).Name("sitemap.pages")
-	r.Get("/sitemap-categories.xml", seo_controller.Categories(app)).Name("sitemap.categories")
-	r.Get("/sitemap-projects.xml", seo_controller.Projects(app)).Name("sitemap.projects")
+	r.Get("/sitemap-general.xml", seo_controller.General(app)).Name("sitemap.general")
+	r.Get("/sitemap-project-:file", seo_controller.Projects(app)).Name("sitemap.projects")
 
 	// Read-only JSON for WebMCP tools and agents.
 	r.Group("/api", "api.", nil, func(api *router.Router) {

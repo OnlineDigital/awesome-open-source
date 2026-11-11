@@ -2,12 +2,13 @@
 package seo_controller
 
 import (
-	"context"
+	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"awesomeopensource.dev/app/application"
 	"awesomeopensource.dev/app/seo"
-	"awesomeopensource.dev/app/store"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -25,12 +26,24 @@ func Robots(app *application.Application) fiber.Handler {
 	}
 }
 
+// ProjectsPerSitemap keeps every file far below the 50,000 URL limit (each project has one URL per locale).
+const ProjectsPerSitemap = 5000
+
+// Index lists sitemap-general.xml plus one sitemap-project-NNN.xml per page of projects.
 func Index(app *application.Application) fiber.Handler {
 	return func(c fiber.Ctx) error {
-		now := time.Now()
-		var refs []seo.SitemapRef
-		for _, name := range []string{"pages", "categories", "projects"} {
-			refs = append(refs, seo.SitemapRef{Loc: app.Cfg.BaseURL + "/sitemap-" + name + ".xml", LastMod: now})
+		ctx := c.Context()
+		total, err := app.Store.CountPublished(ctx)
+		if err != nil {
+			return err
+		}
+		refs := []seo.SitemapRef{{Loc: app.Cfg.BaseURL + "/sitemap-general.xml", LastMod: time.Now()}}
+		for page := 1; (page-1)*ProjectsPerSitemap < total; page++ {
+			mod, err := app.Store.SitemapPageLastMod(ctx, (page-1)*ProjectsPerSitemap, ProjectsPerSitemap)
+			if err != nil {
+				return err
+			}
+			refs = append(refs, seo.SitemapRef{Loc: fmt.Sprintf("%s/sitemap-project-%03d.xml", app.Cfg.BaseURL, page), LastMod: mod})
 		}
 		return xml(c, seo.Index(refs))
 	}
@@ -57,11 +70,8 @@ func entries(app *application.Application, path string, mod time.Time, translate
 	return out
 }
 
-func Pages(app *application.Application) fiber.Handler {
-	return func(c fiber.Ctx) error { return xml(c, seo.URLSet(entries(app, "/", time.Now(), nil, true))) }
-}
-
-func Categories(app *application.Application) fiber.Handler {
+// General holds every URL except project pages: home and categories in all locales.
+func General(app *application.Application) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		cats, err := app.Store.ListCategories(c.Context(), app.Cfg.DefaultLocale)
 		if err != nil {
@@ -71,7 +81,7 @@ func Categories(app *application.Application) fiber.Handler {
 		if err != nil {
 			return err
 		}
-		var urls []seo.SitemapURL
+		urls := entries(app, "/", time.Now(), nil, true)
 		for _, cat := range cats {
 			if cat.ProjectCount > 0 {
 				urls = append(urls, entries(app, "/category/"+cat.Slug, time.Now(), locs[cat.ID], false)...)
@@ -81,51 +91,43 @@ func Categories(app *application.Application) fiber.Handler {
 	}
 }
 
+// Projects serves sitemap-project-NNN.xml: page NNN (1-based) of projects ordered by publication date ascending.
 func Projects(app *application.Application) fiber.Handler {
 	return func(c fiber.Ctx) error {
+		num, ok := strings.CutSuffix(application.RouteParameter(c, "file"), ".xml")
+		page, err := strconv.Atoi(num)
+		if !ok || err != nil || page < 1 || num != fmt.Sprintf("%03d", page) {
+			return fiber.ErrNotFound
+		}
 		ctx := c.Context()
+		ps, err := app.Store.SitemapProjects(ctx, (page-1)*ProjectsPerSitemap, ProjectsPerSitemap)
+		if err != nil {
+			return err
+		}
+		if len(ps) == 0 {
+			return fiber.ErrNotFound
+		}
 		locs, err := app.Store.ProjectLocales(ctx)
 		if err != nil {
 			return err
 		}
 		var urls []seo.SitemapURL
-		for offset := 0; ; offset += 200 {
-			ps, err := page(ctx, app, offset)
-			if err != nil {
-				return err
+		for _, p := range ps {
+			var imgs []string
+			for _, s := range p.Screenshots {
+				imgs = append(imgs, app.Cfg.BaseURL+s)
 			}
-			for _, p := range ps {
-				path := "/project/" + p.Slug
-				var imgs []string
-				for _, s := range p.Screenshots {
-					imgs = append(imgs, app.Cfg.BaseURL+s.Path)
+			for _, e := range entries(app, "/project/"+p.Slug, p.UpdatedAt, locs[p.ID], false) {
+				e.Images = imgs
+				if p.YouTubeID != "" {
+					e.Video = &seo.SitemapVideo{Thumbnail: application.YouTubeThumb(p.YouTubeID), Title: p.FullName + " demo", Description: firstNonEmpty(p.Tagline, p.FullName),
+						Player: application.YouTubeEmbed(p.YouTubeID), PublishedISO: p.CreatedAt.Format(time.RFC3339)}
 				}
-				for _, e := range entries(app, path, p.UpdatedAt, locs[p.ID], false) {
-					e.Images = imgs
-					if p.YouTubeID != "" {
-						e.Video = &seo.SitemapVideo{Thumbnail: application.YouTubeThumb(p.YouTubeID), Title: p.FullName + " demo", Description: firstNonEmpty(p.Tagline, p.FullName),
-							Player: application.YouTubeEmbed(p.YouTubeID), PublishedISO: p.CreatedAt.Format(time.RFC3339)}
-					}
-					urls = append(urls, e)
-				}
-			}
-			if len(ps) < 200 {
-				break
+				urls = append(urls, e)
 			}
 		}
 		return xml(c, seo.URLSet(urls))
 	}
-}
-
-func page(ctx context.Context, app *application.Application, offset int) ([]store.Project, error) {
-	ps, _, err := app.Store.ListProjects(ctx, store.ProjectFilter{Locale: app.Cfg.DefaultLocale, Status: "published", Sort: "name", Limit: 200, Offset: offset})
-	if err != nil {
-		return nil, err
-	}
-	for i := range ps {
-		ps[i].Screenshots, _ = app.Store.Screenshots(ctx, ps[i].ID)
-	}
-	return ps, nil
 }
 
 func firstNonEmpty(a, b string) string {
