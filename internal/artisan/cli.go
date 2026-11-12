@@ -29,7 +29,9 @@ const help = `awesomeopensource.dev artisan
   deploy [--name aos --skip-frontend]
                              Build, then install (first run) or restart the systemd
                              user service ~/.config/systemd/user/NAME.service.
-                             An existing unit file is never modified.
+                             An existing unit file is never modified. On a headless
+                             server enable a persistent user manager once with
+                             sudo loginctl enable-linger USER.
   start [--host HOST --port N --env production|demo]
                              Run the built executable (default: production)
   serve [--host HOST --port N --env ENV]
@@ -310,6 +312,22 @@ func validatePort(value string) error {
 	return nil
 }
 
+// mergeEnv overlays env on the current process environment.
+func mergeEnv(env map[string]string) []string {
+	merged := os.Environ()
+	for key, value := range env {
+		prefix := key + "="
+		filtered := merged[:0]
+		for _, entry := range merged {
+			if !strings.HasPrefix(entry, prefix) {
+				filtered = append(filtered, entry)
+			}
+		}
+		merged = append(filtered, prefix+value)
+	}
+	return merged
+}
+
 func execute(root, command string, args []string, env map[string]string, out io.Writer) error {
 	if runtime.GOOS == "windows" && command == "npm" {
 		args = append([]string{"/d", "/c", "npm"}, args...)
@@ -323,17 +341,7 @@ func execute(root, command string, args []string, env map[string]string, out io.
 	child.Stdin = os.Stdin
 	child.Stdout = out
 	child.Stderr = os.Stderr
-	child.Env = os.Environ()
-	for key, value := range env {
-		prefix := key + "="
-		filtered := child.Env[:0]
-		for _, entry := range child.Env {
-			if !strings.HasPrefix(entry, prefix) {
-				filtered = append(filtered, entry)
-			}
-		}
-		child.Env = append(filtered, prefix+value)
-	}
+	child.Env = mergeEnv(env)
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, os.Interrupt, syscall.SIGTERM)
 	defer signal.Stop(signals)
