@@ -19,6 +19,9 @@ type Assets struct {
 	Styles    []string
 	Version   string
 	DevServer string
+	// Dev marks Vite development mode; DevServer is empty when Vite is
+	// reached through the application's own origin.
+	Dev bool
 }
 
 func LoadAssets(root, env, devServer string) (Assets, error) {
@@ -28,13 +31,16 @@ func LoadAssets(root, env, devServer string) (Assets, error) {
 // LoadAssetsFS uses a build-root filesystem for all manifest and asset reads.
 // A provided filesystem is authoritative: missing files never fall back to disk.
 func LoadAssetsFS(root, env, devServer string, assetFS fs.FS) (Assets, error) {
+	if assetFS == nil && env == "development" && devServer == "/" {
+		return Assets{Script: "/resources/js/app.tsx", Version: "development", Dev: true}, nil
+	}
 	if assetFS == nil && env == "development" && devServer != "" {
 		u, err := url.Parse(devServer)
 		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" {
 			return Assets{}, fmt.Errorf("invalid VITE_DEV_SERVER_URL")
 		}
 		devServer = strings.TrimRight(devServer, "/")
-		return Assets{Script: devServer + "/resources/js/app.tsx", Version: "development", DevServer: devServer}, nil
+		return Assets{Script: devServer + "/resources/js/app.tsx", Version: "development", DevServer: devServer, Dev: true}, nil
 	}
 	if assetFS == nil {
 		assetFS = os.DirFS(filepath.Join(root, "public", "build"))
@@ -113,7 +119,7 @@ func LoadAssetsFS(root, env, devServer string, assetFS fs.FS) (Assets, error) {
 
 func (a Assets) Tag(string) template.HTML {
 	var b strings.Builder
-	if a.DevServer != "" {
+	if a.Dev {
 		fmt.Fprintf(&b, `<script type="module" src="%s/@vite/client"></script>`, template.HTMLEscapeString(a.DevServer))
 	}
 	fmt.Fprintf(&b, `<script type="module" src="%s"></script>`, template.HTMLEscapeString(a.Script))

@@ -22,8 +22,9 @@ const help = `awesomeopensource.dev artisan
 
   help, list                 Show commands
   install                    npm ci and go mod download
-  dev [--host HOST --port N --vite-port N]
-                             Vite HMR and Go rebuild watcher
+  dev [--host HOST --port N]
+                             Vite HMR on HOST:PORT (default 127.0.0.1:5173), proxying to a Go
+                             server on a random free port, with rebuild watcher
   build [--os OS --arch ARCH --output FILE --skip-frontend]
                              Build one executable with embedded frontend
   deploy [--name aos --skip-frontend]
@@ -152,7 +153,7 @@ func Run(args []string, out io.Writer) error {
 	case "deploy":
 		return deploy(root, rest, out)
 	case "dev":
-		op, err := parse(rest, "host port vite-port", "")
+		op, err := parse(rest, "host port", "")
 		if err != nil {
 			return err
 		}
@@ -161,12 +162,6 @@ func Run(args []string, out io.Writer) error {
 		}
 		if err = configureAddress(op); err != nil {
 			return err
-		}
-		if port := op.values["vite-port"]; port != "" {
-			if err = validatePort(port); err != nil {
-				return err
-			}
-			os.Setenv("VITE_PORT", port)
 		}
 		return execute(root, "node", []string{"scripts/dev.mjs"}, nil, out)
 	case "start", "serve":

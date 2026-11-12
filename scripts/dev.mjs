@@ -2,25 +2,30 @@ import { spawn } from 'node:child_process'
 import { watch } from 'node:fs'
 import { mkdir, rm } from 'node:fs/promises'
 import path from 'node:path'
-import { networkInterfaces } from 'node:os'
+import net from 'node:net'
 import { execute, root, goEnv, terminate } from './process.mjs'
 
 await mkdir(path.join(root, 'build'), { recursive: true })
-const vitePort = process.env.VITE_PORT ?? '5173'
-const appAddress = process.env.APP_ADDR ?? '127.0.0.1:8080'
-const appURL = new URL(`http://${appAddress}`)
-const appHost = appURL.hostname.replace(/^\[|\]$/g, '')
-const viteHost = process.env.VITE_HOST ?? appHost
-let advertisedHost = viteHost
-if (['0.0.0.0', '::', ''].includes(advertisedHost)) {
-  advertisedHost = Object.values(networkInterfaces()).flat().find(address => address && !address.internal && address.family === 'IPv4')?.address ?? '127.0.0.1'
+// APP_ADDR (artisan dev --host/--port) is where Vite listens and what browsers
+// reach. Vite proxies every non-Vite request to the Go server, which takes any
+// free loopback port. One origin means this works behind a reverse proxy/VPN.
+const publicAddress = new URL(`http://${process.env.APP_ADDR ?? '127.0.0.1:5173'}`)
+const viteHost = publicAddress.hostname.replace(/^\[|\]$/g, '')
+const vitePort = publicAddress.port || '5173'
+const goPort = await freePort()
+const goAddress = `127.0.0.1:${goPort}`
+function freePort() {
+  return new Promise((resolve, reject) => {
+    const probe = net.createServer()
+    probe.once('error', reject)
+    probe.listen(0, '127.0.0.1', () => { const { port } = probe.address(); probe.close(() => resolve(port)) })
+  })
 }
-const advertisedOrigin = `http://${advertisedHost.includes(':') ? `[${advertisedHost}]` : advertisedHost}:${vitePort}`
-const devServerURL = process.env.VITE_DEV_SERVER_URL ?? advertisedOrigin
-process.env.VITE_HOST = viteHost
-process.env.VITE_DEV_SERVER_URL = devServerURL
-process.env.APP_ADDR = appAddress
-const vite = spawn(process.execPath, [path.join(root, 'node_modules/vite/bin/vite.js'), '--host', viteHost, '--port', vitePort, '--strictPort'], { cwd: root, stdio: 'inherit' })
+// "/" makes the Go app emit same-origin Vite URLs.
+const devServerURL = '/'
+const vite = spawn(process.execPath, [path.join(root, 'node_modules/vite/bin/vite.js'), '--host', viteHost, '--port', vitePort, '--strictPort'], {
+  cwd: root, stdio: 'inherit', env: { ...process.env, VITE_BACKEND_URL: `http://${goAddress}` },
+})
 let server, serverBinary, timer, building = false, queued = false, stopping = false, generation = 0
 const watchers = []
 async function rebuild() {
@@ -37,7 +42,7 @@ async function rebuild() {
     serverBinary = binary
     server = spawn(binary, ['artisan', 'serve', '--env', 'development'], {
       cwd: root, stdio: 'inherit',
-      env: { ...process.env, APP_ROOT: root, APP_ENV: 'development', APP_ADDR: appAddress, VITE_DEV_SERVER_URL: devServerURL },
+      env: { ...process.env, APP_ROOT: root, APP_ENV: 'development', APP_ADDR: goAddress, VITE_DEV_SERVER_URL: devServerURL },
     })
     server.once('error', error => console.error(error))
   } catch (error) { console.error(error.message) }
