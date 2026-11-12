@@ -213,17 +213,28 @@
 .specs .pill-list { margin: 0; }
 .how { border-top: 2px solid var(--deep); padding-top: .8rem; }
 .how summary { color: var(--k3); cursor: pointer; font-weight: 600; }
-.gallery { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr)); gap: 1.25rem 1rem; }
-.gallery-lead { grid-column: 1 / -1; }
-.site .gallery-item { display: grid; gap: .5rem; width: 100%; min-height: 0; padding: 0; background: none; border: 0; color: var(--muted); text-align: left; font: .85rem var(--mono); text-transform: none; letter-spacing: 0; cursor: zoom-in; }
-.site .gallery-item:hover { background: none; } .site .gallery-item:active { transform: none; }
-.gallery-item img { display: block; width: 100%; border: 2px solid var(--deep); border-radius: 8px; background: var(--deep); transition: transform .3s cubic-bezier(.16, 1, .3, 1), box-shadow .2s; }
-.gallery-item:hover img { transform: translateY(-3px); box-shadow: 0 0 0 2px var(--k3); }
-.gallery-lead .gallery-item img { aspect-ratio: 16 / 9; object-fit: cover; }
-.lightbox { border: 0; padding: 0; background: transparent; max-width: min(1100px, 94vw); }
+.shots { display: grid; gap: .9rem; }
+.site .shots-stage { display: block; width: 100%; aspect-ratio: 16 / 9; min-height: 0; padding: 0; background: var(--deep); border: 2px solid var(--border); border-radius: var(--radius); box-shadow: inset 0 -4px 0 #02010f; cursor: zoom-in; transition: border-color .15s; }
+.site .shots-stage:hover { background: var(--deep); border-color: var(--k3); }
+.site .shots-stage:active { transform: none; }
+.site .shots-stage { touch-action: pan-y; user-select: none; -webkit-user-select: none; overflow: hidden; }
+.shots-track, .lb-track { display: flex; transition: transform .45s cubic-bezier(.16, 1, .3, 1); will-change: transform; }
+.shots-track { height: 100%; }
+.shots-track.dragging, .lb-track.dragging, .lb-slide img.dragging { transition: none; }
+.shots-slide { flex: 0 0 100%; min-width: 0; height: 100%; display: grid; place-items: center; padding: clamp(.75rem, 3vw, 2rem); }
+.shots-stage img { display: block; pointer-events: none; max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; border-radius: 4px; }
+.shots-keys { list-style: none; margin: 0; padding: 0; display: flex; gap: .6rem; overflow-x: auto; scrollbar-color: var(--border) transparent; padding-bottom: .35rem; }
+.site .shots-key { flex: none; width: 6.5rem; aspect-ratio: 16 / 10; min-height: 0; padding: 4px; display: grid; place-items: center; background: var(--key-off); border: 0; border-radius: 6px; box-shadow: inset 0 -3px 0 #0d0b36; opacity: .6; transition: opacity .15s, background-color .15s, transform .08s; }
+.site .shots-key:hover { background: var(--surface-2); opacity: 1; }
+.site .shots-key:active { transform: translateY(2px); }
+.site .shots-key.on { background: var(--k3); opacity: 1; box-shadow: inset 0 -3px 0 #a98f00; }
+.shots-key img { display: block; max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 2px; }
+.lightbox { border: 0; padding: 0; background: transparent; width: min(1100px, 94vw); max-width: none; max-height: none; overflow: hidden; }
 .lightbox::backdrop { background: rgb(4 3 26 / .92); }
-.lightbox figure { margin: 0; display: grid; gap: .5rem; justify-items: center; color: var(--text); }
-.lightbox img { max-height: 82vh; border-radius: 8px; max-width: 100%; }
+.lightbox figure { margin: 0; display: grid; gap: .5rem; justify-items: center; color: var(--text); overflow: hidden; }
+.lb-view { width: 100%; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; }
+.lb-slide { flex: 0 0 100%; min-width: 0; display: grid; place-items: center; }
+.lightbox img { display: block; transition: transform .3s cubic-bezier(.16, 1, .3, 1); max-height: 82vh; border-radius: 8px; max-width: 100%; pointer-events: none; }
 .site .lightbox-close { width: 44px; justify-content: center; padding: 0; border-radius: 50%; }
 .deepwiki { display: flex; align-items: center; gap: 1rem; margin-block: 2rem; padding: 1rem 1.25rem; min-height: 5rem; border: 2px solid var(--border); border-radius: var(--radius); background: var(--panel); color: var(--text); text-decoration: none; transition: border-color .15s, background-color .15s, transform .08s; }
 .deepwiki:hover { border-color: var(--k4); background: var(--surface); }
