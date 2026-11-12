@@ -150,7 +150,9 @@ func (c *Client) Fetch(ctx context.Context, owner, name string) (*Repo, error) {
 	}
 
 	var rels []restRelease
-	if err := c.rest(ctx, fmt.Sprintf("/repos/%s/%s/releases?per_page=100", url.PathEscape(owner), url.PathEscape(name)), &rels); err != nil && !errors.Is(err, ErrNotFound) {
+	// The score only needs recency plus up to six releases in the last year; requesting
+	// fewer releases keeps huge release bodies (100+ releases) from breaking the fetch.
+	if err := c.rest(ctx, fmt.Sprintf("/repos/%s/%s/releases?per_page=10", url.PathEscape(owner), url.PathEscape(name)), &rels); err != nil && !errors.Is(err, ErrNotFound) {
 		return nil, err
 	}
 	for _, rel := range rels {

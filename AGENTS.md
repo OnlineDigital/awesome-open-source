@@ -2,6 +2,8 @@
 
 Use the project skill at `.agents/skills/inertia-go-solid/SKILL.md` when changing this Go/Inertia/Solid template. It documents the working helpers and pinned upstream limits.
 
+Use `.agents/skills/catalog-copy/SKILL.md` before writing or translating any catalog copy (project taglines/descriptions, topic and category texts, comparison features). Read it in full instead of improvising tone or structure.
+
 - One Go module, Fiber + inertia-go backend, and common Solid frontend; add routes in `routes/web.go`. Keep net/http use inside the Inertia interoperability boundary.
 - A controller is a folder/package in `app/controllers/`, with each action in a separate snake_case Go file.
 - Keep dependencies pinned. Do not patch dependency caches or hide failed behavior behind fabricated Inertia metadata.
