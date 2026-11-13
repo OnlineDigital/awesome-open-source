@@ -128,12 +128,18 @@ func (a *Application) Page(c fiber.Ctx, component, path string, props upstream.P
 	return nil
 }
 
+// analyticsTag is the traffic analytics snippet rendered from root.html.
+const analyticsTag = `<script defer src="https://stats.onlinedigital.ro/script.js" data-website-id="16550856-70f6-4c1b-b3d6-f517940482f3"></script>`
+
 // injectSEO puts head tags, <html lang> and the no-JS fallback into full HTML responses.
 func injectSEO(c fiber.Ctx, locale string, meta *seo.Meta) {
 	if !strings.HasPrefix(string(c.Response().Header.ContentType()), "text/html") {
 		return
 	}
 	body := c.Response().Body()
+	if strings.HasPrefix(c.Path(), "/admin") {
+		body = bytes.Replace(body, []byte(analyticsTag), nil, 1)
+	}
 	body = bytes.Replace(body, []byte(`<meta name="x-seo-head">`), []byte(meta.HeadHTML()), 1)
 	body = bytes.Replace(body, []byte(`<html lang="en" data-locale-placeholder>`), []byte(`<html lang="`+html.EscapeString(locale)+`">`), 1)
 	body = bytes.Replace(body, []byte(`<template id="x-seo-body"></template>`), []byte(`<noscript>`+string(meta.Fallback)+`</noscript>`), 1)
