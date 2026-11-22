@@ -306,3 +306,4 @@
 .site .topic-row:hover .topic-name { color: var(--k3); text-decoration: underline; text-underline-offset: .2em; }
 @media (max-width: 760px) { .site .topic-row { grid-template-columns: 1fr auto; } .topic-sum { grid-column: 1 / -1; } .cmp .cmp-corner, .cmp .cmp-feature { min-width: 150px; } }
 .view-all { font-size: .875rem; white-space: nowrap; }
+.header-recent { white-space: nowrap; font-size: .875rem; }

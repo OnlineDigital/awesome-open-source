@@ -33,6 +33,7 @@ export default function PublicLayout(props: ParentProps) {
         <div class="wrap header-row">
           <Link href={shared().site.homePath} class="brand"><BrandMark /> <Wordmark name={shared().site.name} /></Link>
           <div class="header-search"><SearchBox /></div>
+          <Link href="/search?sort=new" class="header-recent">{t('nav.recent')}</Link>
           <nav class="lang" aria-label={t('nav.language')}>
             <For each={shared().locales}>{l => <Link href={l.path} class={l.code === locale() ? 'lang-active' : ''} aria-current={l.code === locale() ? 'true' : undefined} hreflang={l.code} lang={l.code} title={l.name}>{l.code.toUpperCase()}</Link>}</For>
           </nav>
