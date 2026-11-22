@@ -10,6 +10,7 @@
  "home.browse": "Browse by category",
  "home.top_active": "Most actively maintained",
  "home.latest": "Recently added",
+ "home.view_all": "View all",
  "search.placeholder": "Search projects, topics, languages…",
  "search.title": "Search",
  "search.results_for": "Results for “{q}”",

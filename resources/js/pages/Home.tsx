@@ -51,7 +51,7 @@ export default function Home(props: { categories: CategoryCard[]; top: Card[]; l
           <div class="tracklist"><For each={props.top}>{p => <ProjectCard project={p} />}</For></div>
         </section>
         <section aria-labelledby="latest">
-          <h2 id="latest" class="deck-h">{t('home.latest')}</h2>
+          <div class="deck-head"><h2 id="latest" class="deck-h">{t('home.latest')}</h2><Link href="/search?sort=new" class="view-all">{t('home.view_all')}</Link></div>
           <div class="tracklist"><For each={props.latest}>{p => <ProjectCard project={p} />}</For></div>
         </section>
       </div>
