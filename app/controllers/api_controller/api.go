@@ -59,7 +59,10 @@ func Project(app *application.Application) fiber.Handler {
 		}
 		card := app.CardOf(p, loc)
 		out := fiber.Map{"project": card, "description": p.Description, "license": p.License, "topics": p.Topics, "homepage": p.Homepage,
-			"github": "https://github.com/" + p.FullName, "activity": application.ActivityOf(p), "markdown": app.Abs(loc, "/llms/"+p.Slug+".md")}
+			"forge": p.Forge, "repository": p.RepoURL, "activity": application.ActivityOf(p), "markdown": app.Abs(loc, "/llms/"+p.Slug+".md")}
+		if p.Forge == "github" { // kept for API clients written before GitLab support
+			out["github"] = p.RepoURL
+		}
 		if p.YouTubeID != "" {
 			out["video"] = application.YouTubeWatch(p.YouTubeID)
 		}
@@ -116,6 +119,10 @@ func DeepWiki(app *application.Application) fiber.Handler {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "project not found"})
 		} else if err != nil {
 			return err
+		}
+		if p.Forge != "github" { // DeepWiki indexes GitHub repositories only
+			c.Set("Cache-Control", "public, max-age=3600")
+			return c.JSON(fiber.Map{"status": "unsupported"})
 		}
 		st := app.DeepWiki.Check(c.Context(), p.FullName)
 		if st == deepwiki.Unknown {

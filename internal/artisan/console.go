@@ -14,8 +14,8 @@ import (
 
 	"awesomeopensource.dev/app/application"
 	"awesomeopensource.dev/app/config"
-	"awesomeopensource.dev/app/github"
 	"awesomeopensource.dev/app/store"
+	"errors"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -92,13 +92,11 @@ func runConsole(command string, args []string, out io.Writer) error {
 			if line == "" || strings.HasPrefix(line, "#") {
 				continue
 			}
-			owner, name, ok := github.ParseRepo(strings.Fields(line)[0])
-			if !ok {
+			if _, _, err := app.AddRepository(ctx, strings.Fields(line)[0], catID); errors.Is(err, application.ErrUnsupportedRepo) {
 				invalid++
-				fmt.Fprintf(out, "skipped (not a GitHub repo): %s\n", line)
+				fmt.Fprintf(out, "skipped (not a %s repo): %s\n", app.Forges.Labels(), line)
 				continue
-			}
-			if _, err := app.Store.CreateProject(ctx, owner, name, catID); err == store.ErrExists {
+			} else if errors.Is(err, store.ErrExists) {
 				existing++
 			} else if err != nil {
 				return err
@@ -137,6 +135,9 @@ func runConsole(command string, args []string, out io.Writer) error {
 		}
 		if cfg.GitHubToken == "" {
 			fmt.Fprintln(out, "warning: GITHUB_TOKEN is not set; unauthenticated GitHub API allows only 60 requests/hour and sees only the default branch")
+		}
+		if cfg.GitLabToken == "" {
+			fmt.Fprintln(out, "note: GITLAB_TOKEN is not set; GitLab projects sync with anonymous (lower) rate limits")
 		}
 		ok, failed, err := app.Syncer.SyncStale(ctx, stale, limit)
 		fmt.Fprintf(out, "synced %d, failed %d\n", ok, failed)

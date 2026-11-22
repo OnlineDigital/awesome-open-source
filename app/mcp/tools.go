@@ -12,7 +12,7 @@ import (
 
 	"awesomeopensource.dev/app/application"
 	"awesomeopensource.dev/app/controllers/admin_project_controller"
-	"awesomeopensource.dev/app/github"
+	"awesomeopensource.dev/app/forge"
 	"awesomeopensource.dev/app/store"
 )
 
@@ -168,19 +168,17 @@ func buildTools(app *application.Application) []Tool {
 				invalid := []string{}
 				var ids []int64
 				for _, r := range a.Repositories {
-					owner, name, ok := github.ParseRepo(r)
-					if !ok {
+					ref, id, err := app.AddRepository(ctx, r, cat)
+					if errors.Is(err, application.ErrUnsupportedRepo) {
 						invalid = append(invalid, r)
 						continue
-					}
-					id, err := app.Store.CreateProject(ctx, owner, name, cat)
-					if errors.Is(err, store.ErrExists) {
-						existing = append(existing, owner+"/"+name)
+					} else if errors.Is(err, store.ErrExists) {
+						existing = append(existing, ref.Forge+":"+ref.FullName())
 						continue
 					} else if err != nil {
 						return nil, err
 					}
-					added = append(added, owner+"/"+name)
+					added = append(added, ref.Forge+":"+ref.FullName())
 					ids = append(ids, id)
 					if a.Publish {
 						_ = app.Store.UpdateProject(ctx, id, store.ProjectEdit{CategoryID: cat, Status: "published"})
@@ -192,7 +190,7 @@ func buildTools(app *application.Application) []Tool {
 					for _, id := range ids {
 						if err := app.Syncer.SyncOne(c, id); err != nil {
 							log.Printf("mcp: sync project %d: %v", id, err)
-							if errors.Is(err, github.ErrRateLimited) {
+							if errors.Is(err, forge.ErrRateLimited) {
 								return
 							}
 						}

@@ -28,6 +28,7 @@ func Show(app *application.Application) fiber.Handler {
 		if err != nil {
 			return err
 		}
+		p.ForgeLabel = app.ForgeLabel(p.Forge)
 		path := "/project/" + p.Slug
 		base := app.Cfg.BaseURL
 		desc := p.Description
@@ -64,7 +65,7 @@ func Show(app *application.Application) fiber.Handler {
 		}
 		in := seo.SoftwareInput{
 			Name: p.Repo, Description: desc, URL: meta.Canonical, Lang: loc, Category: p.CategoryName, Language: p.Language, License: p.License,
-			RepoURL: "https://github.com/" + p.FullName, Homepage: p.Homepage, Version: strings.TrimPrefix(p.LastReleaseTag, "v"),
+			RepoURL: p.RepoURL, Homepage: p.Homepage, Version: strings.TrimPrefix(p.LastReleaseTag, "v"),
 			Image: meta.Image, Screenshots: shots, Topics: p.Topics,
 			PublishedISO: p.CreatedAt.Format(time.RFC3339), ModifiedISO: p.UpdatedAt.Format(time.RFC3339),
 		}
@@ -89,7 +90,7 @@ func Show(app *application.Application) fiber.Handler {
 		}
 		meta.Fallback = seo.Fallback(p.FullName, desc, []seo.Section{
 			{Heading: t("project.activity"), Links: facts},
-			{Links: []seo.Link{{Text: t("project.github"), URL: "https://github.com/" + p.FullName}, {Text: t("project.read_md"), URL: app.Path(loc, "/llms/"+p.Slug+".md")}}},
+			{Links: []seo.Link{{Text: t("project.view_on", "forge", p.ForgeLabel), URL: p.RepoURL}, {Text: t("project.read_md"), URL: app.Path(loc, "/llms/"+p.Slug+".md")}}},
 		})
 
 		compared, err := app.Store.TopicsForSlugs(ctx, append(append([]string{}, p.Topics...), p.ExtraTopics...), loc)

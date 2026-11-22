@@ -9,6 +9,9 @@ import (
 type Project struct {
 	ID             int64           `json:"id"`
 	Slug           string          `json:"slug"`
+	Forge          string          `json:"forge"` // driver id: github, gitlab, ...
+	RepoURL        string          `json:"repoUrl"`
+	ForgeLabel     string          `json:"forgeLabel"` // filled by the application, e.g. "GitLab"
 	Owner          string          `json:"owner"`
 	Repo           string          `json:"repo"`
 	FullName       string          `json:"fullName"`
@@ -95,7 +98,7 @@ type ProjectFilter struct {
 	Status     string // "", draft, published
 	MinScore   float64
 	Featured   bool
-	Topic      string // GitHub topic or curated extra topic
+	Topic      string // forge topic or curated extra topic
 	Sort       string // score | stars | new | name
 	Limit      int
 	Offset     int

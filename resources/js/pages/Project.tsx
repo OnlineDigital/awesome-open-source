@@ -30,7 +30,7 @@ export default function ProjectPage(props: { project: Project; activity: Activit
       </header>
       <p class="lead">{p().tagline}</p>
       <div class="actions">
-        <a class="button" href={`https://github.com/${p().fullName}`} rel="noopener" target="_blank">{t('project.github')} <IconExternal /></a>
+        <a class="button" href={p().repoUrl} rel="noopener" target="_blank">{t('project.view_on', { forge: p().forgeLabel })} <IconExternal /></a>
         <Show when={p().homepage}><a class="button secondary" href={p().homepage} rel="noopener" target="_blank">{t('project.homepage')} <IconExternal /></a></Show>
         <a class="button secondary" href={props.markdownPath} type="text/markdown"><IconDoc /> MD</a>
         <span class="stars"><IconStar width={16} height={16} /> {number(p().stars)}</span>
@@ -51,7 +51,7 @@ export default function ProjectPage(props: { project: Project; activity: Activit
               <Show when={p().machineTranslated}><p class="muted small">{t('project.machine_translated')}</p></Show>
             </section>
           </Show>
-          <DeepWiki slug={p().slug} fullName={p().fullName} />
+          <Show when={p().forge === 'github'}><DeepWiki slug={p().slug} fullName={p().fullName} /></Show>
           <Show when={(p().screenshots?.length ?? 0) > 0}>
             <section aria-labelledby="shots-h"><h2 id="shots-h">{t('project.screenshots')}</h2><Gallery shots={p().screenshots!} fallbackAlt={`${p().repo} screenshot`} /></section>
           </Show>

@@ -1,5 +1,5 @@
-// Package github fetches repository metadata and the activity signals used by
-// the scoring engine. With a token it uses GraphQL to see every branch; without
+// Package github is the GitHub forge driver. It fetches repository metadata and
+// the activity signals used by the scoring engine. With a token it uses GraphQL to see every branch; without
 // one it falls back to the REST API (default branch + pushed_at).
 package github
 
@@ -12,18 +12,21 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
+	"awesomeopensource.dev/app/forge"
 	"awesomeopensource.dev/app/scoring"
 )
 
 var (
-	ErrNotFound    = errors.New("github: repository not found")
-	ErrRateLimited = errors.New("github: rate limited")
+	ErrNotFound    = forge.ErrNotFound
+	ErrRateLimited = forge.ErrRateLimited
 )
+
+// Repo is the shared forge repository type.
+type Repo = forge.Repo
 
 type Client struct {
 	Token   string
@@ -35,45 +38,20 @@ func New(token string) *Client {
 	return &Client{Token: token, BaseURL: "https://api.github.com", HTTP: &http.Client{Timeout: 30 * time.Second}}
 }
 
-// Repo is the metadata persisted on a project plus the scoring signals.
-type Repo struct {
-	Owner, Name   string
-	Description   string
-	Homepage      string
-	License       string
-	Language      string
-	Topics        []string
-	AvatarURL     string
-	Stars, Forks  int
-	OpenIssues    int
-	Archived      bool
-	DefaultBranch string
-	CreatedAt     time.Time
-	PushedAt      time.Time
-	LastRelease   *scoring.Release
-	Signals       scoring.Signals
-	GraphQL       bool // whether all branches were inspected
-}
+func (c *Client) ID() string    { return "github" }
+func (c *Client) Label() string { return "GitHub" }
+func (c *Client) Host() string  { return "github.com" }
 
-var repoRe = regexp.MustCompile(`^[A-Za-z0-9](?:[A-Za-z0-9._-]*)$`)
+func (c *Client) URL(owner, name string) string { return "https://github.com/" + owner + "/" + name }
 
-// ParseRepo accepts https://github.com/o/r[.git][/...], github.com/o/r, git@github.com:o/r.git and o/r.
-func ParseRepo(input string) (owner, name string, ok bool) {
-	s := strings.TrimSpace(input)
-	s = strings.TrimPrefix(s, "git@github.com:")
-	for _, p := range []string{"https://", "http://", "www."} {
-		s = strings.TrimPrefix(s, p)
-	}
-	s = strings.TrimPrefix(s, "github.com/")
-	if i := strings.IndexAny(s, "?#"); i >= 0 {
-		s = s[:i]
-	}
-	parts := strings.Split(strings.Trim(s, "/"), "/")
+// ParsePath accepts "owner/repo[.git][/...]".
+func (c *Client) ParsePath(path string) (owner, name string, ok bool) {
+	parts := strings.Split(strings.Trim(path, "/"), "/")
 	if len(parts) < 2 {
 		return "", "", false
 	}
 	owner, name = parts[0], strings.TrimSuffix(parts[1], ".git")
-	if !repoRe.MatchString(owner) || !repoRe.MatchString(name) || name == "." || name == ".." {
+	if !forge.ValidSegment(owner) || !forge.ValidSegment(name) {
 		return "", "", false
 	}
 	return owner, name, true
@@ -100,7 +78,8 @@ type restRepo struct {
 		Login     string `json:"login"`
 		AvatarURL string `json:"avatar_url"`
 	} `json:"owner"`
-	Name string `json:"name"`
+	Name    string `json:"name"`
+	HTMLURL string `json:"html_url"`
 }
 
 type restRelease struct {
@@ -122,7 +101,7 @@ func (c *Client) Fetch(ctx context.Context, owner, name string) (*Repo, error) {
 		return nil, err
 	}
 	r := &Repo{
-		Owner: meta.Owner.Login, Name: meta.Name, AvatarURL: meta.Owner.AvatarURL,
+		Owner: meta.Owner.Login, Name: meta.Name, AvatarURL: meta.Owner.AvatarURL, WebURL: meta.HTMLURL,
 		Topics: meta.Topics, Stars: meta.Stars, Forks: meta.Forks, OpenIssues: meta.OpenIssues,
 		Archived: meta.Archived, DefaultBranch: meta.DefaultBranch,
 		CreatedAt: parseTime(meta.CreatedAt), PushedAt: parseTime(meta.PushedAt),
@@ -169,12 +148,12 @@ func (c *Client) Fetch(ctx context.Context, owner, name string) (*Repo, error) {
 
 	if c.Token != "" {
 		if err := c.graphqlCommits(ctx, r, &sig); err == nil {
-			r.GraphQL = true
+			r.AllBranches = true
 		} else if errors.Is(err, ErrRateLimited) {
 			return nil, err
 		}
 	}
-	if !r.GraphQL {
+	if !r.AllBranches {
 		if err := c.restCommits(ctx, owner, name, meta.DefaultBranch, &sig); err != nil {
 			return nil, err
 		}

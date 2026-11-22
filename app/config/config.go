@@ -22,7 +22,10 @@ type Config struct {
 	AdminEmail    string
 	AdminPassword string
 
-	GitHubToken string
+	GitHubToken     string
+	GitLabToken     string // gitlab.com
+	GitLabSelfURL   string // optional self-managed instance, added next to gitlab.com
+	GitLabSelfToken string
 
 	TypesenseURL    string
 	TypesenseKey    string
@@ -53,6 +56,9 @@ func Load() Config {
 		AdminEmail:      get("ADMIN_EMAIL", ""),
 		AdminPassword:   get("ADMIN_PASSWORD", ""),
 		GitHubToken:     get("GITHUB_TOKEN", ""),
+		GitLabToken:     get("GITLAB_TOKEN", ""),
+		GitLabSelfURL:   strings.TrimRight(get("GITLAB_SELF_URL", ""), "/"),
+		GitLabSelfToken: get("GITLAB_SELF_TOKEN", ""),
 		TypesenseURL:    strings.TrimRight(get("TYPESENSE_URL", "http://127.0.0.1:8108"), "/"),
 		TypesenseKey:    get("TYPESENSE_API_KEY", ""),
 		TypesensePrefix: get("TYPESENSE_PREFIX", "aos"),

@@ -20,7 +20,7 @@ export default function ProjectsIndex(props: { projects: Project[]; total: numbe
       <h1>Projects <span class="muted small">({props.total})</span></h1>
       <form class="panel" onSubmit={e => { e.preventDefault(); add.transform(d => ({ ...d, categoryId: Number(d.categoryId) || 0 })).post('/admin/projects', { onSuccess: () => add.reset('urls') }) }}>
         <h2>Add projects</h2>
-        <Field label="GitHub repositories" for="urls" hint="One per line: https://github.com/owner/repo or owner/repo. Metadata and the activity score are fetched automatically." error={add.errors.urls}>
+        <Field label="Repositories" for="urls" hint="One per line: a GitHub or GitLab URL (https://gitlab.com/group/project), or owner/repo for GitHub. Metadata and the activity score are fetched automatically." error={add.errors.urls}>
           <textarea id="urls" rows="4" value={add.data.urls} onInput={e => add.setData('urls', e.currentTarget.value)} placeholder="https://github.com/vercel/next.js" />
         </Field>
         <Field label="Category" for="cat">

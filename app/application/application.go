@@ -19,7 +19,9 @@ import (
 	"awesomeopensource.dev/app/db"
 	"awesomeopensource.dev/app/deepwiki"
 	vec "awesomeopensource.dev/app/embed"
-	"awesomeopensource.dev/app/github"
+	"awesomeopensource.dev/app/forge"
+	"awesomeopensource.dev/app/forge/github"
+	"awesomeopensource.dev/app/forge/gitlab"
 	"awesomeopensource.dev/app/i18n"
 	"awesomeopensource.dev/app/search"
 	"awesomeopensource.dev/app/store"
@@ -49,7 +51,7 @@ type Application struct {
 	Indexer    *search.Indexer
 	Translator *translate.Translator
 	Embedder   *vec.Client
-	GitHub     *github.Client
+	Forges     *forge.Registry
 	DeepWiki   *deepwiki.Client
 	Syncer     *syncer.Syncer
 
@@ -87,9 +89,13 @@ func NewCore(cfg config.Config) (*Application, error) {
 	if cfg.EmbeddingsURL != "" {
 		a.Embedder = vec.New(cfg.EmbeddingsURL, cfg.EmbeddingsKey, cfg.EmbeddingsModel)
 	}
-	a.GitHub = github.New(cfg.GitHubToken)
+	drivers := []forge.Driver{github.New(cfg.GitHubToken), gitlab.New(cfg.GitLabToken)} // first is the default for bare owner/repo
+	if cfg.GitLabSelfURL != "" {
+		drivers = append(drivers, gitlab.NewInstance(cfg.GitLabSelfURL, cfg.GitLabSelfToken))
+	}
+	a.Forges = forge.NewRegistry(drivers...)
 	a.DeepWiki = deepwiki.New()
-	a.Syncer = &syncer.Syncer{Store: a.Store, GitHub: a.GitHub, Index: a.Indexer, Embed: a.Embedder, Delay: 300 * time.Millisecond}
+	a.Syncer = &syncer.Syncer{Store: a.Store, Forges: a.Forges, Index: a.Indexer, Embed: a.Embedder, Delay: 300 * time.Millisecond}
 	return a, nil
 }
 

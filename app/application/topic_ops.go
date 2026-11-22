@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"awesomeopensource.dev/app/github"
+	"awesomeopensource.dev/app/forge"
 	"awesomeopensource.dev/app/store"
 	"github.com/jackc/pgx/v5/pgconn"
 )
@@ -120,19 +120,22 @@ func (a *Application) SetFeatureValue(ctx context.Context, topicID, projectID, f
 	return a.Store.SetFeatureValue(ctx, topicID, projectID, featureID, state, clean)
 }
 
-// ResolveProject finds a project by numeric id, slug, or "owner/repo".
+// ResolveProject finds a project by numeric id, slug, repository URL or "owner/repo".
 func (a *Application) ResolveProject(ctx context.Context, ref string) (*store.Project, error) {
 	ref = strings.TrimSpace(ref)
 	if id, err := strconv.ParseInt(ref, 10, 64); err == nil {
 		return a.Store.GetProject(ctx, id, a.Cfg.DefaultLocale)
 	}
-	if owner, repo, ok := github.ParseRepo(ref); ok {
-		ref = store.Slugify(owner + "-" + repo)
+	if r, ok := a.Forges.Parse(ref); ok {
+		if id, err := a.Store.ProjectIDByRef(ctx, r); err == nil {
+			return a.Store.GetProject(ctx, id, a.Cfg.DefaultLocale)
+		}
+		ref = store.Slugify(r.Owner + "-" + r.Name)
 	}
 	return a.Store.GetProjectBySlug(ctx, store.Slugify(ref), a.Cfg.DefaultLocale, false)
 }
 
-// AddProjectToTopic adds the topic to the project's curated topics (kept across GitHub resyncs).
+// AddProjectToTopic adds the topic to the project's curated topics (kept across forge resyncs).
 func (a *Application) AddProjectToTopic(ctx context.Context, topicID int64, ref string) (*store.Project, error) {
 	t, err := a.Store.TopicByID(ctx, topicID, a.Cfg.DefaultLocale)
 	if err != nil {
@@ -226,4 +229,26 @@ func (a *Application) TranslateTopic(ctx context.Context, id int64, force bool) 
 		}
 	}
 	return done, nil
+}
+
+// ErrUnsupportedRepo means the input is not a repository URL on any enabled forge.
+var ErrUnsupportedRepo = errors.New("not a supported repository URL")
+
+// AddRepository parses a repository URL (or bare owner/repo for the default forge)
+// and inserts it as a draft project. It returns store.ErrExists for duplicates.
+func (a *Application) AddRepository(ctx context.Context, input string, categoryID *int64) (forge.Ref, int64, error) {
+	ref, ok := a.Forges.Parse(input)
+	if !ok {
+		return ref, 0, ErrUnsupportedRepo
+	}
+	id, err := a.Store.CreateProject(ctx, ref, a.Forges.URL(ref.Forge, ref.Owner, ref.Name), categoryID)
+	return ref, id, err
+}
+
+// ForgeLabel names the forge a project lives on, e.g. "GitLab"; unknown IDs are shown as-is.
+func (a *Application) ForgeLabel(id string) string {
+	if d, ok := a.Forges.Get(id); ok {
+		return d.Label()
+	}
+	return id
 }

@@ -28,7 +28,7 @@ export interface Activity {
 }
 export interface Screenshot { id: number; path: string; alt: string; position: number }
 export interface Project {
-  id: number; slug: string; owner: string; repo: string; fullName: string
+  id: number; slug: string; forge: string; forgeLabel: string; repoUrl: string; owner: string; repo: string; fullName: string
   categoryId: number | null; categorySlug: string; categoryName: string
   homepage: string; license: string; language: string; topics: string[]; extraTopics?: string[]; avatarUrl: string
   stars: number; forks: number; openIssues: number; archived: boolean

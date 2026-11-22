@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"awesomeopensource.dev/app/github"
+	"awesomeopensource.dev/app/forge"
 	"awesomeopensource.dev/app/scoring"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -35,7 +35,7 @@ func Slugify(s string) string {
 }
 
 const projectSelect = `
-SELECT p.id, p.slug, p.github_owner, p.github_repo, p.category_id, COALESCE(c.slug,''), COALESCE(ct.name, cd.name, c.slug, ''),
+SELECT p.id, p.slug, p.forge, p.owner, p.repo, p.repo_url, p.category_id, COALESCE(c.slug,''), COALESCE(ct.name, cd.name, c.slug, ''),
   p.homepage, p.license, p.language, p.topics, p.extra_topics, p.avatar_url, p.stars, p.forks, p.open_issues, p.archived, p.default_branch,
   p.pushed_at, p.last_commit_at, p.last_release_at, p.last_release_tag,
   p.activity_score::float8, p.activity_tier::int, p.score_breakdown, p.youtube_id, p.status, p.featured, p.synced_at, p.sync_error, p.created_at, p.updated_at,
@@ -51,7 +51,7 @@ LEFT JOIN category_translations cd ON cd.category_id = c.id AND cd.locale = $2`
 func scanProject(row pgx.Row) (*Project, error) {
 	var p Project
 	var breakdown []byte
-	err := row.Scan(&p.ID, &p.Slug, &p.Owner, &p.Repo, &p.CategoryID, &p.CategorySlug, &p.CategoryName,
+	err := row.Scan(&p.ID, &p.Slug, &p.Forge, &p.Owner, &p.Repo, &p.RepoURL, &p.CategoryID, &p.CategorySlug, &p.CategoryName,
 		&p.Homepage, &p.License, &p.Language, &p.Topics, &p.ExtraTopics, &p.AvatarURL, &p.Stars, &p.Forks, &p.OpenIssues, &p.Archived, &p.DefaultBranch,
 		&p.PushedAt, &p.LastCommitAt, &p.LastReleaseAt, &p.LastReleaseTag,
 		&p.Score, &p.Tier, &breakdown, &p.YouTubeID, &p.Status, &p.Featured, &p.SyncedAt, &p.SyncError, &p.CreatedAt, &p.UpdatedAt,
@@ -122,7 +122,7 @@ func (s *Store) ListProjects(ctx context.Context, f ProjectFilter) ([]Project, i
 		add("? = ANY(p.topics || p.extra_topics)", f.Topic)
 	}
 	if q := strings.TrimSpace(f.Query); q != "" {
-		add("(p.slug ILIKE ? OR p.github_owner ILIKE ?)", "%"+escapeLike(q)+"%")
+		add("(p.slug ILIKE ? OR p.owner ILIKE ?)", "%"+escapeLike(q)+"%")
 	}
 	cond := " WHERE " + strings.Join(where, " AND ")
 	var total int
@@ -162,14 +162,35 @@ func escapeLike(s string) string {
 	return strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(s)
 }
 
-// CreateProject inserts a draft; the first sync fills in the metadata.
-func (s *Store) CreateProject(ctx context.Context, owner, repo string, categoryID *int64) (int64, error) {
-	slug := Slugify(owner + "-" + repo)
-	var id int64
-	err := s.DB.QueryRow(ctx, `INSERT INTO projects (slug, github_owner, github_repo, category_id) VALUES ($1,$2,$3,$4)
-		ON CONFLICT (github_owner, github_repo) DO NOTHING RETURNING id`, slug, owner, repo, categoryID).Scan(&id)
-	if errors.Is(err, pgx.ErrNoRows) {
+// CreateProject inserts a draft; the first sync fills in the metadata. The slug
+// is owner-repo; a clash with a project on another forge gets the forge suffix.
+func (s *Store) CreateProject(ctx context.Context, ref forge.Ref, repoURL string, categoryID *int64) (int64, error) {
+	if _, err := s.ProjectIDByRef(ctx, ref); err == nil {
 		return 0, ErrExists
+	}
+	base := Slugify(ref.Owner + "-" + ref.Name)
+	for _, slug := range []string{base, base + "-" + ref.Forge} {
+		var id int64
+		err := s.DB.QueryRow(ctx, `INSERT INTO projects (slug, forge, owner, repo, repo_url, category_id) VALUES ($1,$2,$3,$4,$5,$6)
+			ON CONFLICT DO NOTHING RETURNING id`, slug, ref.Forge, ref.Owner, ref.Name, repoURL, categoryID).Scan(&id)
+		if err == nil {
+			return id, nil
+		} else if !errors.Is(err, pgx.ErrNoRows) {
+			return 0, err
+		}
+		if _, err := s.ProjectIDByRef(ctx, ref); err == nil { // lost a race
+			return 0, ErrExists
+		}
+	}
+	return 0, ErrExists
+}
+
+// ProjectIDByRef finds a project by forge and repository path (case-insensitive).
+func (s *Store) ProjectIDByRef(ctx context.Context, ref forge.Ref) (int64, error) {
+	var id int64
+	err := s.DB.QueryRow(ctx, `SELECT id FROM projects WHERE forge=$1 AND lower(owner)=lower($2) AND lower(repo)=lower($3)`, ref.Forge, ref.Owner, ref.Name).Scan(&id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, ErrNotFound
 	}
 	return id, err
 }
@@ -203,9 +224,9 @@ func (s *Store) DeleteProject(ctx context.Context, id int64) ([]string, error) {
 	return paths, nil
 }
 
-// ApplyGitHub stores refreshed metadata and the computed score.
-func (s *Store) ApplyGitHub(ctx context.Context, id int64, r *github.Repo, res scoring.Result) error {
-	breakdown, _ := json.Marshal(map[string]any{"result": res, "signals": r.Signals, "graphql": r.GraphQL})
+// ApplyRepo stores refreshed forge metadata and the computed score.
+func (s *Store) ApplyRepo(ctx context.Context, id int64, r *forge.Repo, res scoring.Result) error {
+	breakdown, _ := json.Marshal(map[string]any{"result": res, "signals": r.Signals, "allBranches": r.AllBranches})
 	var relAt *time.Time
 	relTag := ""
 	if r.LastRelease != nil {
@@ -230,11 +251,12 @@ func (s *Store) ApplyGitHub(ctx context.Context, id int64, r *github.Repo, res s
 	_, err = tx.Exec(ctx, `UPDATE projects SET
 		homepage = CASE WHEN homepage = '' THEN $2 ELSE homepage END,
 		license=$3, language=$4, topics=$5, avatar_url=$6, stars=$7, forks=$8, open_issues=$9, archived=$10, default_branch=$11,
-		gh_created_at=$12, pushed_at=$13, last_commit_at=$14, last_release_at=$15, last_release_tag=$16,
-		activity_score=$17, activity_tier=$18, score_breakdown=$19, signals=$20, synced_at=now(), sync_error='', updated_at=now()
+		repo_created_at=$12, pushed_at=$13, last_commit_at=$14, last_release_at=$15, last_release_tag=$16,
+		activity_score=$17, activity_tier=$18, score_breakdown=$19, signals=$20, synced_at=now(), sync_error='', updated_at=now(),
+		repo_url = CASE WHEN $21 = '' THEN repo_url ELSE $21 END
 		WHERE id=$1`,
 		id, r.Homepage, r.License, r.Language, nonNil(r.Topics), r.AvatarURL, r.Stars, r.Forks, r.OpenIssues, r.Archived, r.DefaultBranch,
-		createdPtr, pushedPtr, lastPtr, relAt, relTag, res.Score, res.Tier, breakdown, breakdown)
+		createdPtr, pushedPtr, lastPtr, relAt, relTag, res.Score, res.Tier, breakdown, breakdown, r.WebURL)
 	if err != nil {
 		return err
 	}
@@ -261,13 +283,13 @@ func (s *Store) MarkSyncError(ctx context.Context, id int64, msg string) error {
 }
 
 type SyncTarget struct {
-	ID          int64
-	Owner, Repo string
+	ID int64
+	forge.Ref
 }
 
 // StaleProjects returns never-synced projects first, then the oldest syncs.
 func (s *Store) StaleProjects(ctx context.Context, olderThan time.Duration, limit int) ([]SyncTarget, error) {
-	rows, err := s.DB.Query(ctx, `SELECT id, github_owner, github_repo FROM projects
+	rows, err := s.DB.Query(ctx, `SELECT id, forge, owner, repo FROM projects
 		WHERE synced_at IS NULL OR synced_at < now() - make_interval(secs => $1)
 		ORDER BY synced_at NULLS FIRST LIMIT $2`, olderThan.Seconds(), limit)
 	if err != nil {
@@ -277,7 +299,7 @@ func (s *Store) StaleProjects(ctx context.Context, olderThan time.Duration, limi
 	var out []SyncTarget
 	for rows.Next() {
 		var t SyncTarget
-		if err := rows.Scan(&t.ID, &t.Owner, &t.Repo); err != nil {
+		if err := rows.Scan(&t.ID, &t.Forge, &t.Owner, &t.Name); err != nil {
 			return nil, err
 		}
 		out = append(out, t)
@@ -287,7 +309,7 @@ func (s *Store) StaleProjects(ctx context.Context, olderThan time.Duration, limi
 
 func (s *Store) ProjectTarget(ctx context.Context, id int64) (SyncTarget, error) {
 	t := SyncTarget{ID: id}
-	err := s.DB.QueryRow(ctx, `SELECT github_owner, github_repo FROM projects WHERE id=$1`, id).Scan(&t.Owner, &t.Repo)
+	err := s.DB.QueryRow(ctx, `SELECT forge, owner, repo FROM projects WHERE id=$1`, id).Scan(&t.Forge, &t.Owner, &t.Name)
 	return t, err
 }
 
@@ -548,7 +570,7 @@ func (s *Store) SitemapPageLastMod(ctx context.Context, offset, limit int) (t ti
 
 // SitemapProjects returns published projects ordered by publication date ascending (new ones append at the end).
 func (s *Store) SitemapProjects(ctx context.Context, offset, limit int) ([]SitemapProject, error) {
-	rows, err := s.DB.Query(ctx, `SELECT p.id, p.slug, p.github_owner || '/' || p.github_repo, COALESCE(d.tagline,''), p.youtube_id, p.created_at, p.updated_at
+	rows, err := s.DB.Query(ctx, `SELECT p.id, p.slug, p.owner || '/' || p.repo, COALESCE(d.tagline,''), p.youtube_id, p.created_at, p.updated_at
 		FROM projects p LEFT JOIN project_translations d ON d.project_id = p.id AND d.locale = $3
 		WHERE p.status='published' ORDER BY p.published_at, p.id OFFSET $1 LIMIT $2`, offset, limit, s.DefaultLocale)
 	if err != nil {

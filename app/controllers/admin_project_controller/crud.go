@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"awesomeopensource.dev/app/application"
-	"awesomeopensource.dev/app/github"
+	"awesomeopensource.dev/app/forge"
 	"awesomeopensource.dev/app/store"
 	"github.com/gofiber/fiber/v3"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -46,7 +46,7 @@ type createRequest struct {
 	CategoryID int64  `json:"categoryId" form:"categoryId"`
 }
 
-// Store adds one or many GitHub repositories as drafts and syncs them in the background.
+// Store adds one or many repositories (any enabled forge) as drafts and syncs them in the background.
 func Store(app *application.Application) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var req createRequest
@@ -61,13 +61,11 @@ func Store(app *application.Application) fiber.Handler {
 		added, existing := 0, 0
 		var invalid []string
 		for _, line := range strings.FieldsFunc(req.URLs, func(r rune) bool { return r == '\n' || r == '\r' || r == ',' || r == ' ' || r == '\t' }) {
-			owner, name, ok := github.ParseRepo(line)
-			if !ok {
+			_, id, err := app.AddRepository(c.Context(), line, catID)
+			if errors.Is(err, application.ErrUnsupportedRepo) {
 				invalid = append(invalid, line)
 				continue
-			}
-			id, err := app.Store.CreateProject(c.Context(), owner, name, catID)
-			if errors.Is(err, store.ErrExists) {
+			} else if errors.Is(err, store.ErrExists) {
 				existing++
 				continue
 			} else if err != nil {
@@ -77,13 +75,13 @@ func Store(app *application.Application) fiber.Handler {
 			ids = append(ids, id)
 		}
 		if added == 0 && len(invalid) > 0 {
-			return app.Redirect303(c, "/admin/projects", map[string]string{"urls": "Not a GitHub repository: " + strings.Join(invalid, ", ")}, "")
+			return app.Redirect303(c, "/admin/projects", map[string]string{"urls": "Not a supported repository (" + app.Forges.Labels() + "): " + strings.Join(invalid, ", ")}, "")
 		}
 		if added == 0 && existing == 0 {
-			return app.Redirect303(c, "/admin/projects", map[string]string{"urls": "Enter at least one GitHub URL or owner/repo."}, "")
+			return app.Redirect303(c, "/admin/projects", map[string]string{"urls": "Enter at least one repository URL or owner/repo."}, "")
 		}
 		go syncIDs(app, ids)
-		msg := fmt.Sprintf("Added %d project(s), %d already existed; fetching GitHub data and scores in the background.", added, existing)
+		msg := fmt.Sprintf("Added %d project(s), %d already existed; fetching repository data and scores in the background.", added, existing)
 		if len(invalid) > 0 {
 			msg += fmt.Sprintf(" Skipped %d invalid entries.", len(invalid))
 		}
@@ -100,7 +98,7 @@ func syncIDs(app *application.Application, ids []int64) {
 	for _, id := range ids {
 		if err := app.Syncer.SyncOne(ctx, id); err != nil {
 			log.Printf("admin: sync project %d: %v", id, err)
-			if errors.Is(err, github.ErrRateLimited) {
+			if errors.Is(err, forge.ErrRateLimited) {
 				return
 			}
 		}

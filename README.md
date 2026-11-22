@@ -30,6 +30,8 @@ Weights: recency of the newest commit on **any branch** 40% (half-life 90 days) 
 Missing data (e.g. no GitHub releases) is dropped and re-weighted (no-release projects get a 7% discount). Archived = 1.0; >1y without commits capped at 2.4; >2y at 1.4.
 With `GITHUB_TOKEN` GraphQL inspects all branches and exact commit counts; without it REST sees the default branch only (commit counts cap at 100).
 
+Repositories come from forge drivers in `app/forge` (GitHub first, then GitLab); paste any `https://gitlab.com/group[/subgroup]/project` URL. `GITLAB_TOKEN` (optional, `read_api`) raises GitLab rate limits and `GITLAB_SELF_URL`/`GITLAB_SELF_TOKEN` add a self-managed instance next to gitlab.com. GitLab commit counts are walked from the API and cap at 1000 per year. A new forge implements `forge.Driver` and is registered in `application.NewCore`.
+
 ## SEO / AI surface
 - Locale routes: default locale at `/`, others at `/ro/...`; hreflang only for translated pages, untranslated ones are `noindex` + canonical to default.
 - Head tags + schema.org JSON-LD (WebSite+SearchAction, CollectionPage, SoftwareApplication, VideoObject, BreadcrumbList) rendered server-side; `<noscript>` fallback content.

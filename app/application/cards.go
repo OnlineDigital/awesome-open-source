@@ -93,9 +93,10 @@ func ActivityOf(p *store.Project) *Activity {
 		return nil
 	}
 	var raw struct {
-		Result  scoring.Result  `json:"result"`
-		Signals scoring.Signals `json:"signals"`
-		GraphQL bool            `json:"graphql"`
+		Result      scoring.Result  `json:"result"`
+		Signals     scoring.Signals `json:"signals"`
+		AllBranches bool            `json:"allBranches"`
+		GraphQL     bool            `json:"graphql"` // key written before forge drivers
 	}
 	if err := json.Unmarshal(p.Breakdown, &raw); err != nil {
 		return nil
@@ -110,7 +111,7 @@ func ActivityOf(p *store.Project) *Activity {
 	return &Activity{
 		Score: *p.Score, Tier: raw.Result.Tier, Label: raw.Result.Label, Cap: raw.Result.Cap, Components: raw.Result.Components,
 		Commits30: raw.Signals.Commits30, Commits90: raw.Signals.Commits90, Commits365: raw.Signals.Commits365,
-		ActiveBranches: raw.Signals.ActiveBranches90, TotalBranches: raw.Signals.TotalBranches, Releases12m: n12, AllBranches: raw.GraphQL,
+		ActiveBranches: raw.Signals.ActiveBranches90, TotalBranches: raw.Signals.TotalBranches, Releases12m: n12, AllBranches: raw.AllBranches || raw.GraphQL,
 		LastCommitAt: p.LastCommitAt, LastReleaseAt: p.LastReleaseAt, LastReleaseTag: p.LastReleaseTag,
 	}
 }

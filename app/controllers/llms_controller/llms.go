@@ -109,7 +109,7 @@ func Project(app *application.Application) fiber.Handler {
 		t := tFor(app, loc)
 		in := llms.ProjectInput{
 			T: t, Slug: p.Slug, FullName: p.FullName, Tagline: p.Tagline, Description: p.Description, CategorySlug: p.CategorySlug, CategoryName: p.CategoryName,
-			PageURL: app.Abs(loc, "/project/"+p.Slug), GitHubURL: "https://github.com/" + p.FullName, Homepage: p.Homepage, License: p.License, Language: p.Language,
+			PageURL: app.Abs(loc, "/project/"+p.Slug), RepoURL: p.RepoURL, RepoLabel: app.ForgeLabel(p.Forge), Homepage: p.Homepage, License: p.License, Language: p.Language,
 			Topics: p.Topics, Stars: p.Stars, Archived: p.Archived, Score: p.Score, LastCommit: p.LastCommitAt, LastRelease: p.LastReleaseAt, LastReleaseTag: p.LastReleaseTag,
 			Machine: p.Machine,
 		}

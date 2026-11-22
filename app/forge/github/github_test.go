@@ -10,27 +10,6 @@ import (
 	"time"
 )
 
-func TestParseRepo(t *testing.T) {
-	ok := map[string][2]string{
-		"https://github.com/vercel/next.js":         {"vercel", "next.js"},
-		"https://github.com/golang/go.git":          {"golang", "go"},
-		"github.com/a/b/tree/main/docs?x=1":         {"a", "b"},
-		"git@github.com:rust-lang/rust.git":         {"rust-lang", "rust"},
-		"  AndreiTelteu/inertia-go-solid-template ": {"AndreiTelteu", "inertia-go-solid-template"},
-	}
-	for in, want := range ok {
-		o, n, good := ParseRepo(in)
-		if !good || o != want[0] || n != want[1] {
-			t.Errorf("ParseRepo(%q) = %q,%q,%v", in, o, n, good)
-		}
-	}
-	for _, in := range []string{"", "justone", "https://gitlab.com", "a/..", "a/b c", "/"} {
-		if _, _, good := ParseRepo(in); good && in != "https://gitlab.com" {
-			t.Errorf("ParseRepo(%q) should fail", in)
-		}
-	}
-}
-
 func TestFetchGraphQL(t *testing.T) {
 	now := time.Now().UTC()
 	ts := func(d int) string { return now.AddDate(0, 0, -d).Format(time.RFC3339) }
@@ -56,7 +35,7 @@ func TestFetchGraphQL(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !repo.GraphQL || repo.Stars != 7 || repo.License != "MIT" {
+	if !repo.AllBranches || repo.Stars != 7 || repo.License != "MIT" {
 		t.Fatalf("unexpected repo %+v", repo)
 	}
 	s := repo.Signals

@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"awesomeopensource.dev/app/db"
-	"awesomeopensource.dev/app/github"
+	"awesomeopensource.dev/app/forge"
 	"awesomeopensource.dev/app/scoring"
 	"awesomeopensource.dev/app/store"
 )
@@ -59,17 +59,30 @@ func TestStoreLifecycle(t *testing.T) {
 		t.Fatalf("category fallback wrong: %+v %v", cat, err)
 	}
 
-	id, err := s.CreateProject(ctx, "acme", "Widget", &catID)
+	id, err := s.CreateProject(ctx, forge.Ref{Forge: "github", Owner: "acme", Name: "Widget"}, "https://github.com/acme/Widget", &catID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.CreateProject(ctx, "acme", "Widget", &catID); err != store.ErrExists {
+	if _, err := s.CreateProject(ctx, forge.Ref{Forge: "github", Owner: "acme", Name: "Widget"}, "https://github.com/acme/Widget", &catID); err != store.ErrExists {
 		t.Fatalf("duplicate should be ErrExists, got %v", err)
 	}
+	glID, err := s.CreateProject(ctx, forge.Ref{Forge: "gitlab", Owner: "acme", Name: "Widget"}, "https://gitlab.com/acme/Widget", &catID)
+	if err != nil {
+		t.Fatalf("same path on another forge should be allowed: %v", err)
+	}
+	if gl, err := s.GetProject(ctx, glID, "en"); err != nil || gl.Slug != "acme-widget-gitlab" || gl.Forge != "gitlab" || gl.RepoURL != "https://gitlab.com/acme/Widget" {
+		t.Fatalf("gitlab project wrong: %+v %v", gl, err)
+	}
+	if found, err := s.ProjectIDByRef(ctx, forge.Ref{Forge: "github", Owner: "ACME", Name: "widget"}); err != nil || found != id {
+		t.Fatalf("ProjectIDByRef = %d, %v; want %d", found, err, id)
+	}
+	if _, err := s.DeleteProject(ctx, glID); err != nil {
+		t.Fatal(err)
+	}
 	now := time.Now()
-	repo := &github.Repo{Owner: "acme", Name: "Widget", Description: "A widget", Stars: 42, Topics: []string{"go", "db"}, Language: "Go",
+	repo := &forge.Repo{Owner: "acme", Name: "Widget", Description: "A widget", Stars: 42, Topics: []string{"go", "db"}, Language: "Go",
 		PushedAt: now, Signals: scoring.Signals{LastCommitAt: now}, LastRelease: &scoring.Release{Tag: "v1.0.0", PublishedAt: now}}
-	if err := s.ApplyGitHub(ctx, id, repo, scoring.Compute(repo.Signals)); err != nil {
+	if err := s.ApplyRepo(ctx, id, repo, scoring.Compute(repo.Signals)); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.UpdateProject(ctx, id, store.ProjectEdit{CategoryID: &catID, YouTubeID: "dQw4w9WgXcQ", Status: "published"}); err != nil {
@@ -90,7 +103,7 @@ func TestStoreLifecycle(t *testing.T) {
 	}
 	// Re-syncing must not overwrite edited english text.
 	_ = s.SaveTranslation(ctx, id, store.Translation{Locale: "en", Tagline: "Edited", Description: "d"})
-	_ = s.ApplyGitHub(ctx, id, repo, scoring.Compute(repo.Signals))
+	_ = s.ApplyRepo(ctx, id, repo, scoring.Compute(repo.Signals))
 	if en, _ := s.GetProjectBySlug(ctx, "acme-widget", "en", true); en.Tagline != "Edited" {
 		t.Fatalf("sync overwrote edit: %q", en.Tagline)
 	}
@@ -103,7 +116,7 @@ func TestStoreLifecycle(t *testing.T) {
 	if err := s.AddExtraTopic(ctx, id, "admin-panel"); err != nil {
 		t.Fatal(err)
 	}
-	_ = s.ApplyGitHub(ctx, id, repo, scoring.Compute(repo.Signals))
+	_ = s.ApplyRepo(ctx, id, repo, scoring.Compute(repo.Signals))
 	if tl, total, _ := s.ListProjects(ctx, store.ProjectFilter{Topic: "admin-panel"}); total != 1 || len(tl) != 1 {
 		t.Fatalf("curated topic lost after resync: %d", total)
 	}
@@ -147,7 +160,7 @@ func TestStoreLifecycle(t *testing.T) {
 	if err := s.SetEmbedding(ctx, id, []float32{0.1, 0.2, 0.3}); err != nil {
 		t.Fatal(err)
 	}
-	id2, _ := s.CreateProject(ctx, "acme", "Gadget", &catID)
+	id2, _ := s.CreateProject(ctx, forge.Ref{Forge: "github", Owner: "acme", Name: "Gadget"}, "https://github.com/acme/Gadget", &catID)
 	_ = s.UpdateProject(ctx, id2, store.ProjectEdit{CategoryID: &catID, Status: "published"})
 	_ = s.SetEmbedding(ctx, id2, []float32{0.1, 0.2, 0.31})
 	rel, err := s.Related(ctx, p, "en", 5)

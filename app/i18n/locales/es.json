@@ -45,7 +45,7 @@
  "project.language": "Lenguaje",
  "project.topics": "Temas",
  "project.related": "Proyectos similares",
- "project.github": "Ver en GitHub",
+ "project.view_on": "Ver en {forge}",
  "project.homepage": "Sitio web",
  "project.machine_translated": "Este texto se tradujo automáticamente.",
  "project.read_md": "Versión Markdown para agentes de IA",

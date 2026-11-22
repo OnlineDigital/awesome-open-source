@@ -101,24 +101,24 @@ func BuildCategory(in CategoryInput) string {
 type Shot struct{ URL, Alt string }
 
 type ProjectInput struct {
-	T                                     T
-	Slug, FullName, Tagline, Description  string
-	CategorySlug, CategoryName            string
-	PageURL, GitHubURL, Homepage, License string
-	Language                              string
-	Topics                                []string
-	Stars                                 int
-	Archived                              bool
-	Score                                 *float64
-	TierLabel, Cap                        string
-	Components                            []scoring.Component
-	LastCommit, LastRelease               *time.Time
-	LastReleaseTag                        string
-	Commits90, Commits365                 int
-	VideoURL                              string
-	Screenshots                           []Shot
-	Related                               []Proj
-	Machine                               bool
+	T                                              T
+	Slug, FullName, Tagline, Description           string
+	CategorySlug, CategoryName                     string
+	PageURL, RepoURL, RepoLabel, Homepage, License string
+	Language                                       string
+	Topics                                         []string
+	Stars                                          int
+	Archived                                       bool
+	Score                                          *float64
+	TierLabel, Cap                                 string
+	Components                                     []scoring.Component
+	LastCommit, LastRelease                        *time.Time
+	LastReleaseTag                                 string
+	Commits90, Commits365                          int
+	VideoURL                                       string
+	Screenshots                                    []Shot
+	Related                                        []Proj
+	Machine                                        bool
 }
 
 func date(t *time.Time) string {
@@ -147,7 +147,7 @@ func BuildProject(in ProjectInput) string {
 			fmt.Fprintf(&b, "- %s: %s\n", k, v)
 		}
 	}
-	fact("GitHub", in.GitHubURL)
+	fact(in.RepoLabel, in.RepoURL)
 	fact("HTML", in.PageURL)
 	fact(t("project.homepage"), in.Homepage)
 	fact(t("project.license"), in.License)

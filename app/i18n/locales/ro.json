@@ -45,7 +45,7 @@
  "project.language": "Limbaj",
  "project.topics": "Subiecte",
  "project.related": "Proiecte similare",
- "project.github": "Vezi pe GitHub",
+ "project.view_on": "Vezi pe {forge}",
  "project.homepage": "Site web",
  "project.machine_translated": "Acest text a fost tradus automat.",
  "project.read_md": "Versiunea Markdown pentru agenți AI",
